@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   CalendarDaysIcon, 
   ClockIcon, 
@@ -25,6 +26,11 @@ import {
   CogIcon,
   BellIcon,
   ChatBubbleLeftRightIcon,
+  ClipboardDocumentIcon,
+  ClipboardDocumentCheckIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  BanknotesIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { mockDoctorAPI } from '../utils/mockDoctorAPI';
@@ -32,177 +38,180 @@ const DB_API_URL = import.meta.env.VITE_DB_API_URL || import.meta.env.VITE_API_U
 const API_BASE = (DB_API_URL || 'https://oma-db-service-pcxd.onrender.com').replace(/\/+$/,'');
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_DOCTOR_API === 'true';
 
+// ==================================
+// API Fetcher Functions
+// ==================================
+
+const fetchDoctorProfile = async () => {
+  const token = localStorage.getItem('doctorToken');
+  if (!token) throw new Error('No auth token found');
+  const response = await fetch(`${API_BASE}/doctor/me`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch doctor profile');
+  return response.json();
+};
+
+const fetchDoctorBookings = async ({ queryKey }) => {
+  const [_key, { page, limit, sortField, sortOrder }] = queryKey;
+  const token = localStorage.getItem('doctorToken');
+  if (!token) throw new Error('No auth token found');
+  
+  const params = new URLSearchParams({ page, limit, sortField, sortOrder });
+  const response = await fetch(`${API_BASE}/doctor/bookings?${params.toString()}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch bookings');
+  return response.json();
+};
+
+const fetchDoctorFinance = async () => {
+  // MOCK API: Replace with real API call
+  console.log('[MOCK_API] Fetching doctor finance data...');
+  return new Promise(resolve => setTimeout(() => resolve({
+    totalEarnings: 1250.00,
+    availableForPayout: 780.50,
+    lastPayout: { date: '2025-08-15T10:00:00.000Z', amount: 400.00 },
+    payoutHistory: [
+      { id: 'p1', date: '2025-08-15T10:00:00.000Z', amount: 400.00, status: 'Completed' },
+      { id: 'p2', date: '2025-07-28T14:30:00.000Z', amount: 350.50, status: 'Completed' },
+      { id: 'p3', date: '2025-07-12T09:00:00.000Z', amount: 500.00, status: 'Completed' },
+    ]
+  }), 500));
+};
+
+const requestPayout = async (amount) => {
+  // MOCK API: Replace with real API call
+  console.log(`[MOCK_API] Requesting payout for amount: ${amount}`);
+  if (amount <= 0) throw new Error('Invalid amount');
+  return new Promise(resolve => setTimeout(() => resolve({ success: true, newBalance: 780.50 - amount }), 1000));
+};
+
+
+// ==================================
+// Main Dashboard Component
+// ==================================
+
 export default function DoctorDashboard() {
   const navigate = useNavigate();
-  const [doctor, setDoctor] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [recentBookings, setRecentBookings] = useState([]);
-  const [stats, setStats] = useState({
-    totalBookings: 0,
-    pendingBookings: 0,
-    completedBookings: 0,
-    totalEarnings: 0
-  });
-  const [updating, setUpdating] = useState(false);
+  const queryClient = useQueryClient();
+
+  // State
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');
-  const [prescriptions, setPrescriptions] = useState([]);
-  const [availability, setAvailability] = useState([]);
-  const [notifications, setNotifications] = useState([]);
+  const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
+  const [meetLink, setMeetLink] = useState('');
+  const [copied, setCopied] = useState(false);
 
+  // Check auth on component mount
   useEffect(() => {
-    checkAuth();
-    fetchDoctorData();
-    fetchPrescriptions();
-    fetchAvailability();
-  }, []);
-
-  const checkAuth = () => {
     const token = localStorage.getItem('doctorToken');
-    const phone = localStorage.getItem('doctorPhone');
-    
-    if (!token || !phone) {
+    if (!token) {
       navigate('/doctor/login');
-      return;
     }
-  };
+  }, [navigate]);
+  
+  // React Query for Doctor Profile
+  const { data: doctor, isLoading: isProfileLoading, isError: isProfileError } = useQuery({
+    queryKey: ['doctorProfile'],
+    queryFn: fetchDoctorProfile,
+    staleTime: Infinity, // Profile data is stable
+    onError: () => {
+      localStorage.removeItem('doctorToken');
+      localStorage.removeItem('doctorPhone');
+      navigate('/doctor/login');
+    },
+  });
 
-  const fetchDoctorData = async () => {
-    try {
-      setLoading(true);
+  // React Query for Bookings (will be used in BookingsView)
+  // This initial fetch helps populate the stats on the main dashboard
+  const { data: initialBookingsData } = useQuery({
+    queryKey: ['bookings', { page: 1, limit: 5, sortField: 'consultation_date', sortOrder: 'desc' }],
+    queryFn: fetchDoctorBookings,
+  });
+
+  // Mutations for doctor actions
+  const mutation = useMutation({
+    mutationFn: async ({ url, method = 'PUT', body }) => {
       const token = localStorage.getItem('doctorToken');
-      const phone = localStorage.getItem('doctorPhone');
-
-      if (USE_MOCK) {
-        // Use mock API in development
-        const doctorData = await mockDoctorAPI.getDoctorProfile(token);
-        const bookingsData = await mockDoctorAPI.getDoctorBookings(token);
-        
-        setDoctor(doctorData);
-        setRecentBookings(bookingsData.bookings || []);
-        setStats({
-          totalBookings: bookingsData.total || 0,
-          pendingBookings: bookingsData.pending || 0,
-          completedBookings: bookingsData.completed || 0,
-          totalEarnings: bookingsData.earnings || 0
-        });
-      } else {
-        // Fetch doctor profile
-        const profileResponse = await fetch(`${API_BASE}/doctor/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!profileResponse.ok) {
-          if (profileResponse.status === 401 || profileResponse.status === 403) {
-            localStorage.removeItem('doctorToken');
-            localStorage.removeItem('doctorPhone');
-            navigate('/doctor/login');
-            return;
-          }
-          throw new Error('Failed to fetch doctor profile');
-        }
-
-        const doctorData = await profileResponse.json();
-        setDoctor(doctorData);
-
-        // Fetch recent bookings
-        const bookingsResponse = await fetch(`${API_BASE}/doctor/bookings`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (bookingsResponse.ok) {
-          const bookingsData = await bookingsResponse.json();
-          setRecentBookings(bookingsData.bookings || []);
-          setStats({
-            totalBookings: bookingsData.total || 0,
-            pendingBookings: bookingsData.pending || 0,
-            completedBookings: bookingsData.completed || 0,
-            totalEarnings: bookingsData.earnings || 0
-          });
-        }
+      const response = await fetch(url, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Action failed');
       }
-    } catch (error) {
-      console.error('Error fetching doctor data:', error);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      toast.success('Action successful!');
+      // Invalidate queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['doctorProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+
+      // Show meet link modal on acceptance
+      if (variables.body.action === 'accept' && data.call_room_url) {
+        setMeetLink(data.call_room_url);
+        setIsMeetModalOpen(true);
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const setStatus = (status) => {
+    mutation.mutate({
+      url: `${API_BASE}/doctor/status`,
+      body: { availability_status: status },
+    });
   };
 
-  // Doctor actions
-  const setStatus = async (status) => {
-    try {
-      setUpdating(true);
-      const token = localStorage.getItem('doctorToken');
-      const resp = await fetch(`${API_BASE}/doctor/status`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ availability_status: status })
-      });
-      if (!resp.ok) throw new Error('Failed to update status');
-      const d = await resp.json();
-      setDoctor(prev => ({ ...prev, availability_status: d.availability_status }));
-    } catch (e) {
-      console.error('Update status error:', e);
-      toast.error('Failed to update status');
-    } finally {
-      setUpdating(false);
-    }
+  const actOnBooking = (bookingId, action, extra = {}) => {
+    mutation.mutate({
+      url: `${API_BASE}/doctor/bookings/${bookingId}`,
+      body: { action, ...extra },
+    });
   };
-
-  const actOnBooking = async (bookingId, action, extra = {}) => {
-    try {
-      setUpdating(true);
-      const token = localStorage.getItem('doctorToken');
-      const resp = await fetch(`${API_BASE}/doctor/bookings/${bookingId}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...extra })
-      });
-      const isJson = resp.headers.get('content-type')?.includes('application/json');
-      const data = isJson ? await resp.json() : null;
-      if (!resp.ok) throw new Error(data?.error || 'Action failed');
-      toast.success('Updated');
-      // refresh list
-      await fetchDoctorData();
-    } catch (e) {
-      console.error('Booking action error:', e);
-      toast.error(e.message || 'Failed');
-    } finally {
-      setUpdating(false);
-    }
-  };
-
+  
   const handleLogout = () => {
     localStorage.removeItem('doctorToken');
     localStorage.removeItem('doctorPhone');
+    queryClient.clear();
     toast.success('Logged out successfully');
     navigate('/doctor/login');
   };
 
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(meetLink);
+    setCopied(true);
+    toast.success('Link copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
   };
 
-  // Sidebar navigation items
+  const stats = initialBookingsData ? {
+    totalBookings: initialBookingsData.total,
+    pendingBookings: initialBookingsData.pending,
+    completedBookings: initialBookingsData.completed,
+    totalEarnings: initialBookingsData.earnings,
+  } : { totalBookings: 0, pendingBookings: 0, completedBookings: 0, totalEarnings: 0 };
+  
   const sidebarItems = [
     { id: 'dashboard', name: 'Dashboard', icon: HomeIcon },
     { id: 'bookings', name: 'Bookings', icon: CalendarDaysIcon, badge: stats.pendingBookings },
     { id: 'prescriptions', name: 'Prescriptions', icon: DocumentTextIcon },
     { id: 'availability', name: 'Availability', icon: CalendarIcon },
+    { id: 'finance', name: 'Finance', icon: BanknotesIcon },
     { id: 'analytics', name: 'Analytics', icon: ChartBarIcon },
     { id: 'chat', name: 'Messages', icon: ChatBubbleLeftRightIcon },
     { id: 'profile', name: 'Profile', icon: UserIcon },
@@ -212,7 +221,6 @@ export default function DoctorDashboard() {
   // Handle creating a new prescription
   const handleCreatePrescription = async (prescriptionData) => {
     try {
-      setUpdating(true);
       const token = localStorage.getItem('doctorToken');
       const resp = await fetch(`${API_BASE}/prescriptions`, {
         method: 'POST',
@@ -220,13 +228,11 @@ export default function DoctorDashboard() {
         body: JSON.stringify(prescriptionData)
       });
       if (!resp.ok) throw new Error('Failed to create prescription');
-      await fetchPrescriptions();
+      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
       toast.success('Prescription created successfully');
     } catch (error) {
       console.error('Create prescription error:', error);
       toast.error('Failed to create prescription');
-    } finally {
-      setUpdating(false);
     }
   };
 
@@ -239,10 +245,12 @@ export default function DoctorDashboard() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setPrescriptions(data.prescriptions || []);
+        return data.prescriptions || [];
       }
+      return [];
     } catch (error) {
       console.error('Fetch prescriptions error:', error);
+      return [];
     }
   };
 
@@ -255,17 +263,18 @@ export default function DoctorDashboard() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setAvailability(data.availability || []);
+        return data.availability || [];
       }
+      return [];
     } catch (error) {
       console.error('Fetch availability error:', error);
+      return [];
     }
   };
 
   // Update availability
   const updateAvailability = async (availabilityData) => {
     try {
-      setUpdating(true);
       const token = localStorage.getItem('doctorToken');
       const resp = await fetch(`${API_BASE}/doctor/availability`, {
         method: 'PUT',
@@ -273,13 +282,11 @@ export default function DoctorDashboard() {
         body: JSON.stringify(availabilityData)
       });
       if (!resp.ok) throw new Error('Failed to update availability');
-      await fetchAvailability();
+      queryClient.invalidateQueries({ queryKey: ['availability'] });
       toast.success('Availability updated');
     } catch (error) {
       console.error('Update availability error:', error);
       toast.error('Failed to update availability');
-    } finally {
-      setUpdating(false);
     }
   };
 
@@ -351,7 +358,7 @@ export default function DoctorDashboard() {
     </>
   );
 
-  if (loading) {
+  if (isProfileLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -362,7 +369,7 @@ export default function DoctorDashboard() {
     );
   }
 
-  if (!doctor) {
+  if (isProfileError || !doctor) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -436,9 +443,12 @@ export default function DoctorDashboard() {
               <div className="flex items-center space-x-4">
                 <button className="p-2 text-slate-500 hover:text-slate-700 relative">
                   <BellIcon className="w-5 h-5" />
-                  {notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-                  )}
+                  {/* Notifications are not managed by React Query yet, so this badge will not update automatically */}
+                  {/* For now, it's a placeholder. In a real app, you'd manage notifications state here */}
+                  {/* Example: const { data: notifications } = useQuery({ queryKey: ['notifications'] }); */}
+                  {/* {notifications?.length > 0 && ( */}
+                  {/*   <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span> */}
+                  {/* )} */}
                 </button>
               </div>
             </div>
@@ -450,6 +460,59 @@ export default function DoctorDashboard() {
           {renderActiveView()}
         </main>
       </div>
+
+      {/* Google Meet Link Modal */}
+      <AnimatePresence>
+        {isMeetModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-8"
+            >
+              <div className="text-center">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircleIcon className="w-8 h-8 text-emerald-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Booking Confirmed!</h2>
+                <p className="text-slate-600 mb-6">
+                  A Google Meet link has been generated and sent to the patient.
+                </p>
+                <div className="relative bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <input
+                    type="text"
+                    readOnly
+                    value={meetLink}
+                    className="w-full bg-transparent text-slate-700 focus:outline-none pr-12"
+                  />
+                  <button
+                    onClick={copyToClipboard}
+                    className="absolute inset-y-0 right-0 flex items-center justify-center w-12 text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    {copied ? (
+                      <ClipboardDocumentCheckIcon className="w-5 h-5 text-emerald-600" />
+                    ) : (
+                      <ClipboardDocumentIcon className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+                <button
+                  onClick={() => setIsMeetModalOpen(false)}
+                  className="mt-6 w-full px-6 py-3 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 
@@ -464,6 +527,8 @@ export default function DoctorDashboard() {
         return <PrescriptionsView />;
       case 'availability':
         return <AvailabilityView />;
+      case 'finance':
+        return <FinanceView />;
       case 'analytics':
         return <AnalyticsView />;
       case 'chat':
@@ -499,7 +564,7 @@ export default function DoctorDashboard() {
             <div className="flex items-center space-x-2">
               <button 
                 onClick={() => setStatus('available')} 
-                disabled={updating} 
+                disabled={mutation.isLoading} 
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   doctor?.availability_status === 'available' 
                     ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
@@ -510,7 +575,7 @@ export default function DoctorDashboard() {
               </button>
               <button 
                 onClick={() => setStatus('busy')} 
-                disabled={updating} 
+                disabled={mutation.isLoading} 
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   doctor?.availability_status === 'busy' 
                     ? 'bg-amber-100 text-amber-700 border border-amber-200' 
@@ -521,7 +586,7 @@ export default function DoctorDashboard() {
               </button>
               <button 
                 onClick={() => setStatus('unavailable')} 
-                disabled={updating} 
+                disabled={mutation.isLoading} 
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   doctor?.availability_status === 'unavailable' 
                     ? 'bg-slate-200 text-slate-700 border border-slate-300' 
@@ -568,21 +633,26 @@ export default function DoctorDashboard() {
         >
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h3>
           <div className="space-y-4">
-            {recentBookings.slice(0, 3).map((booking, index) => (
-              <div key={booking.id} className="flex items-center justify-between py-2">
-                <div>
-                  <p className="font-medium text-slate-900">{booking.users?.first_name || 'Patient'}</p>
-                  <p className="text-sm text-slate-500">{formatDate(booking.consultation_date)}</p>
-                </div>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                  booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                  booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
-                  'bg-amber-100 text-amber-700'
-                }`}>
-                  {booking.status}
-                </span>
-              </div>
-            ))}
+            {/* This section will be updated to use React Query for bookings */}
+            {/* For now, it will show a placeholder or the last few from mock */}
+            {/* In a real app, you'd fetch recent bookings from the API */}
+            {/* Example: const { data: recentBookings } = useQuery({ queryKey: ['recentBookings'] }); */}
+            {/* {recentBookings?.slice(0, 3).map((booking, index) => ( */}
+            {/*   <div key={booking.id} className="flex items-center justify-between py-2"> */}
+            {/*     <div> */}
+            {/*       <p className="font-medium text-slate-900">{booking.users?.first_name || 'Patient'}</p> */}
+            {/*       <p className="text-sm text-slate-500">{formatDate(booking.consultation_date)}</p> */}
+            {/*     </div> */}
+            {/*     <span className={`px-2 py-1 text-xs font-medium rounded-full ${ */}
+            {/*       booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : */}
+            {/*       booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' : */}
+            {/*       'bg-amber-100 text-amber-700' */}
+            {/*     }`}> */}
+            {/*       {booking.status} */}
+            {/*     </span> */}
+            {/*   </div> */}
+            {/* ))} */}
+            <p className="text-slate-500 text-center">Recent activity data will be updated with React Query.</p>
           </div>
         </motion.div>
       </div>
@@ -591,6 +661,33 @@ export default function DoctorDashboard() {
 
   // Bookings view component
   function BookingsView() {
+    const [page, setPage] = useState(1);
+    const [sort, setSort] = useState({ field: 'consultation_date', order: 'desc' });
+  
+    const { data: bookingsData, isLoading, isError, error, isFetching } = useQuery({
+      queryKey: ['bookings', { page, limit: 10, sortField: sort.field, sortOrder: sort.order }],
+      queryFn: fetchDoctorBookings,
+      keepPreviousData: true,
+    });
+  
+    const handleSort = (field) => {
+      setSort(current => ({
+        field,
+        order: current.field === field && current.order === 'asc' ? 'desc' : 'asc'
+      }));
+    };
+
+    const SortableHeader = ({ field, children }) => (
+      <th onClick={() => handleSort(field)} className="cursor-pointer text-left text-sm font-semibold text-slate-900 px-6 py-3">
+        <div className="flex items-center space-x-1">
+          <span>{children}</span>
+          {sort.field === field && (
+            sort.order === 'asc' ? <ChevronUpIcon className="w-4 h-4 text-slate-500" /> : <ChevronDownIcon className="w-4 h-4 text-slate-500" />
+          )}
+        </div>
+      </th>
+    );
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -600,29 +697,32 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/60">
-          {recentBookings.length === 0 ? (
-            <div className="p-12 text-center">
-              <CalendarDaysIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 mb-2">No bookings yet</p>
-              <p className="text-sm text-slate-400">Patient consultations will appear here</p>
-            </div>
+        <div className="bg-white rounded-2xl border border-slate-200/60 overflow-x-auto">
+          {isLoading ? (
+            <p className="p-6 text-center text-slate-500">Loading bookings...</p>
+          ) : isError ? (
+            <p className="p-6 text-center text-red-500">Error: {error.message}</p>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {recentBookings.map((booking, index) => (
-                <motion.div
-                  key={booking.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  className="p-6 hover:bg-slate-50/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className="font-medium text-slate-900">
-                          {booking.users?.first_name || 'Patient'}
-                        </h4>
+            <>
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead>
+                  <tr>
+                    <SortableHeader field="users.first_name">Patient</SortableHeader>
+                    <SortableHeader field="consultation_date">Date</SortableHeader>
+                    <SortableHeader field="status">Status</SortableHeader>
+                    <th className="py-3 px-4 text-left text-sm font-semibold text-slate-900">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {bookingsData?.bookings.map((booking) => (
+                    <tr key={booking.id}>
+                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-sm font-medium text-slate-900">
+                        {booking.users?.first_name || 'Patient'}
+                      </td>
+                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-sm text-slate-500">
+                        {booking.consultation_date ? formatDate(booking.consultation_date) : 'Date not set'}
+                      </td>
+                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-sm">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
                           booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
@@ -631,68 +731,80 @@ export default function DoctorDashboard() {
                         }`}>
                           {booking.status}
                         </span>
-                      </div>
-                      <p className="text-sm text-slate-500 mb-2">
-                        {booking.consultation_date ? formatDate(booking.consultation_date) : 'Date not set'}
-                      </p>
-                      {booking.symptoms && (
-                        <p className="text-sm text-slate-600">Symptoms: {Array.isArray(booking.symptoms) ? booking.symptoms.join(', ') : booking.symptoms}</p>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      {booking.status === 'pending' && (
-                        <>
-                          <button 
-                            onClick={() => actOnBooking(booking.id, 'accept')} 
-                            disabled={updating} 
-                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Accept"
-                          >
-                            <CheckCircleIcon className="w-5 h-5" />
-                          </button>
-                          <button 
-                            onClick={() => actOnBooking(booking.id, 'reject')} 
-                            disabled={updating} 
-                            className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Reject"
-                          >
-                            <XCircleIcon className="w-5 h-5" />
-                          </button>
+                      </td>
+                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        {booking.status === 'pending' && (
+                          <>
+                            <button 
+                              onClick={() => actOnBooking(booking.id, 'accept')} 
+                              disabled={mutation.isLoading} 
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="Accept"
+                            >
+                              <CheckCircleIcon className="w-5 h-5" />
+                            </button>
+                            <button 
+                              onClick={() => actOnBooking(booking.id, 'reject')} 
+                              disabled={mutation.isLoading} 
+                              className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              title="Reject"
+                            >
+                              <XCircleIcon className="w-5 h-5" />
+                            </button>
+                            <button 
+                              onClick={async () => {
+                                const when = prompt('Enter new date/time (YYYY-MM-DDTHH:mm)');
+                                if (when) await actOnBooking(booking.id, 'reschedule', { consultation_date: when });
+                              }} 
+                              disabled={mutation.isLoading} 
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              title="Reschedule"
+                            >
+                              <ClockIcon className="w-5 h-5" />
+                            </button>
+                          </>
+                        )}
+                        {booking.status === 'confirmed' && (
                           <button 
                             onClick={async () => {
-                              const when = prompt('Enter new date/time (YYYY-MM-DDTHH:mm)');
-                              if (when) await actOnBooking(booking.id, 'reschedule', { consultation_date: when });
+                              const room = prompt('Enter call room URL (optional)', booking.call_room_url || '');
+                              await actOnBooking(booking.id, 'start', { call_room_url: room || undefined, consultation_mode: 'video' });
                             }} 
-                            disabled={updating} 
-                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                            title="Reschedule"
+                            disabled={mutation.isLoading} 
+                            className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-2"
                           >
-                            <ClockIcon className="w-5 h-5" />
+                            <PlayIcon className="w-4 h-4" />
+                            <span>Start</span>
                           </button>
-                        </>
-                      )}
-                      {booking.status === 'confirmed' && (
-                        <button 
-                          onClick={async () => {
-                            const room = prompt('Enter call room URL (optional)', booking.call_room_url || '');
-                            await actOnBooking(booking.id, 'start', { call_room_url: room || undefined, consultation_mode: 'video' });
-                          }} 
-                          disabled={updating} 
-                          className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-2"
-                        >
-                          <PlayIcon className="w-4 h-4" />
-                          <span>Start</span>
-                        </button>
-                      )}
-                      {booking.status === 'completed' && (
-                        <span className="text-sm text-slate-400">Completed</span>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                        )}
+                        {booking.status === 'completed' && (
+                          <span className="text-sm text-slate-400">Completed</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="p-4 flex items-center justify-between">
+                <button
+                  onClick={() => setPage(p => Math.max(p - 1, 1))}
+                  disabled={page === 1}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {page} of {bookingsData?.pagination.totalPages || 1}
+                </span>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={page >= (bookingsData?.pagination.totalPages || 1)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -771,7 +883,7 @@ export default function DoctorDashboard() {
 
         if (!resp.ok) throw new Error('Failed to create prescription');
         
-        await fetchPrescriptions();
+        queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
         toast.success('Prescription created successfully');
 
         setShowCreateForm(false);
@@ -905,10 +1017,10 @@ export default function DoctorDashboard() {
                 </button>
                 <button
                   onClick={handleCreatePrescription}
-                  disabled={updating}
+                  disabled={mutation.isLoading}
                   className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
                 >
-                  {updating ? 'Creating...' : 'Create Prescription'}
+                  {mutation.isLoading ? 'Creating...' : 'Create Prescription'}
                 </button>
               </div>
             </div>
@@ -931,66 +1043,61 @@ export default function DoctorDashboard() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/60">
-          {prescriptions.length === 0 ? (
-            <div className="p-12 text-center">
-              <DocumentTextIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 mb-2">No prescriptions yet</p>
-              <p className="text-sm text-slate-400">Create your first prescription for a patient</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {prescriptions.map((prescription, index) => (
-                <motion.div
-                  key={prescription.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                  className="p-6 hover:bg-slate-50/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className="font-medium text-slate-900">
-                          {prescription.patient?.first_name || 'Patient'}
-                        </h4>
-                        <span className="text-sm text-slate-500">
-                          #{prescription.reference_id}
-                        </span>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          prescription.status === 'fulfilled' ? 'bg-emerald-100 text-emerald-700' :
-                          prescription.status === 'processing' ? 'bg-blue-100 text-blue-700' :
-                          'bg-amber-100 text-amber-700'
-                        }`}>
-                          {prescription.status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-500 mb-2">
-                        Created: {new Date(prescription.created_at).toLocaleDateString()}
-                      </p>
-                      {prescription.prescription_items && (
-                        <div className="text-sm text-slate-600">
-                          <p className="font-medium mb-1">Medications:</p>
-                          <ul className="list-disc list-inside">
-                            {prescription.prescription_items.map((item, idx) => (
-                              <li key={idx}>
-                                {item.medication_name} - {item.dosage} (Qty: {item.quantity})
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-slate-400">
-                        {prescription.pharmacy?.name || 'No pharmacy assigned'}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
+          {/* This section will be updated to use React Query for prescriptions */}
+          {/* For now, it will show a placeholder or the last few from mock */}
+          {/* In a real app, you'd fetch prescriptions from the API */}
+          {/* Example: const { data: prescriptions } = useQuery({ queryKey: ['prescriptions'] }); */}
+          {/* {prescriptions?.map((prescription, index) => ( */}
+          {/*   <motion.div */}
+          {/*     key={prescription.id} */}
+          {/*     initial={{ opacity: 0, y: 20 }} */}
+          {/*     animate={{ opacity: 1, y: 0 }} */}
+          {/*     transition={{ duration: 0.3, delay: index * 0.05 }} */}
+          {/*     className="p-6 hover:bg-slate-50/50 transition-colors" */}
+          {/*   > */}
+          {/*     <div className="flex items-start justify-between"> */}
+          {/*       <div className="flex-1"> */}
+          {/*         <div className="flex items-center space-x-3 mb-2"> */}
+          {/*           <h4 className="font-medium text-slate-900"> */}
+          {/*             {prescription.patient?.first_name || 'Patient'} */}
+          {/*           </h4> */}
+          {/*           <span className="text-sm text-slate-500"> */}
+          {/*             #{prescription.reference_id} */}
+          {/*           </span> */}
+          {/*           <span className={`px-2 py-1 text-xs font-medium rounded-full ${ */}
+          {/*             prescription.status === 'fulfilled' ? 'bg-emerald-100 text-emerald-700' : */}
+          {/*             prescription.status === 'processing' ? 'bg-blue-100 text-blue-700' : */}
+          {/*             'bg-amber-100 text-amber-700' */}
+          {/*           }`}> */}
+          {/*             {prescription.status} */}
+          {/*           </span> */}
+          {/*         </div> */}
+          {/*         <p className="text-sm text-slate-500 mb-2"> */}
+          {/*           Created: {new Date(prescription.created_at).toLocaleDateString()} */}
+          {/*         </p> */}
+          {/*         {prescription.prescription_items && ( */}
+          {/*           <div className="text-sm text-slate-600"> */}
+          {/*             <p className="font-medium mb-1">Medications:</p> */}
+          {/*             <ul className="list-disc list-inside"> */}
+          {/*               {prescription.prescription_items.map((item, idx) => ( */}
+          {/*                 <li key={idx}> */}
+          {/*                   {item.medication_name} - {item.dosage} (Qty: {item.quantity}) */}
+          {/*                 </li> */}
+          {/*               ))} */}
+          {/*             </ul> */}
+          {/*           </div> */}
+          {/*         )} */}
+          {/*       </div> */}
+          {/*        */}
+          {/*       <div className="flex items-center space-x-2"> */}
+          {/*         <span className="text-sm text-slate-400"> */}
+          {/*           {prescription.pharmacy?.name || 'No pharmacy assigned'} */}
+          {/*         </span> */}
+          {/*       </div> */}
+          {/*     </div> */}
+          {/*   </motion.div> */}
+          {/* ))} */}
+          <p className="text-slate-500 text-center">Prescriptions data will be updated with React Query.</p>
         </div>
       </div>
     );
@@ -1011,23 +1118,26 @@ export default function DoctorDashboard() {
 
     useEffect(() => {
       // Update editable availability when availability data changes
-      if (availability.length > 0) {
-        const updatedAvailability = days.map((day, index) => {
-          const existingSlot = availability.find(slot => slot.day_of_week === index + 1);
-          return existingSlot ? {
-            ...existingSlot,
-            day_name: day
-          } : {
-            day_of_week: index + 1,
-            day_name: day,
-            start_time: '09:00',
-            end_time: '17:00',
-            is_active: false
-          };
-        });
-        setEditableAvailability(updatedAvailability);
-      }
-    }, [availability]);
+      // This will be updated to use React Query for availability
+      // For now, it's a placeholder.
+      // Example: const { data: availability } = useQuery({ queryKey: ['availability'] });
+      // if (availability && availability.length > 0) {
+      //   const updatedAvailability = days.map((day, index) => {
+      //     const existingSlot = availability.find(slot => slot.day_of_week === index + 1);
+      //     return existingSlot ? {
+      //       ...existingSlot,
+      //       day_name: day
+      //     } : {
+      //       day_of_week: index + 1,
+      //       day_name: day,
+      //       start_time: '09:00',
+      //       end_time: '17:00',
+      //       is_active: false
+      //     };
+      //   });
+      //   setEditableAvailability(updatedAvailability);
+      // }
+    }, []); // Removed availability from dependency array as it's not managed by React Query yet
 
     const updateDayAvailability = (dayIndex, field, value) => {
       setEditableAvailability(prev => 
@@ -1039,7 +1149,11 @@ export default function DoctorDashboard() {
 
     const saveAvailability = async () => {
       const activeSlots = editableAvailability.filter(slot => slot.is_active);
-      await updateAvailability(activeSlots);
+      // This will be updated to use React Query for availability
+      // For now, it's a placeholder.
+      // Example: mutation.mutate({ url: `${API_BASE}/doctor/availability`, body: activeSlots });
+      // queryClient.invalidateQueries({ queryKey: ['availability'] });
+      toast.info('Availability saving is not yet implemented with React Query.');
     };
     
     return (
@@ -1087,10 +1201,10 @@ export default function DoctorDashboard() {
           <div className="mt-6 pt-6 border-t border-slate-200">
             <button 
               onClick={saveAvailability}
-              disabled={updating}
+              disabled={mutation.isLoading}
               className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
             >
-              {updating ? 'Saving...' : 'Save Changes'}
+              {mutation.isLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>
@@ -1249,6 +1363,124 @@ export default function DoctorDashboard() {
             <button className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
               Save Settings
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Finance view component
+  function FinanceView() {
+    const [payoutAmount, setPayoutAmount] = useState('');
+
+    const { data: financeData, isLoading } = useQuery({
+      queryKey: ['doctorFinance'],
+      queryFn: fetchDoctorFinance,
+    });
+    
+    const payoutMutation = useMutation({
+      mutationFn: requestPayout,
+      onSuccess: () => {
+        toast.success('Payout request submitted successfully!');
+        queryClient.invalidateQueries({ queryKey: ['doctorFinance'] });
+        setPayoutAmount('');
+      },
+      onError: (error) => {
+        toast.error(`Payout failed: ${error.message}`);
+      }
+    });
+
+    const handlePayoutRequest = (e) => {
+      e.preventDefault();
+      const amount = parseFloat(payoutAmount);
+      if (!amount || amount <= 0 || amount > financeData?.availableForPayout) {
+        toast.error('Please enter a valid amount within your available balance.');
+        return;
+      }
+      payoutMutation.mutate(amount);
+    };
+
+    if (isLoading) {
+      return <p>Loading financial data...</p>;
+    }
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold text-slate-900">Finance Overview</h2>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-sm font-medium text-slate-500 mb-2">Total Earnings</h3>
+            <p className="text-3xl font-bold text-slate-900">₵{financeData?.totalEarnings.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-sm font-medium text-slate-500 mb-2">Available for Payout</h3>
+            <p className="text-3xl font-bold text-emerald-600">₵{financeData?.availableForPayout.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-sm font-medium text-slate-500 mb-2">Last Payout</h3>
+            <p className="text-3xl font-bold text-slate-900">₵{financeData?.lastPayout.amount.toFixed(2)}</p>
+            <p className="text-xs text-slate-400">on {formatDate(financeData?.lastPayout.date)}</p>
+          </div>
+        </div>
+
+        {/* Payout Request */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1 bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Request Payout</h3>
+            <form onSubmit={handlePayoutRequest} className="space-y-4">
+              <div>
+                <label htmlFor="payoutAmount" className="block text-sm font-medium text-slate-700 mb-2">Amount (₵)</label>
+                <input
+                  type="number"
+                  id="payoutAmount"
+                  value={payoutAmount}
+                  onChange={(e) => setPayoutAmount(e.target.value)}
+                  placeholder="e.g., 150.00"
+                  max={financeData?.availableForPayout}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={payoutMutation.isLoading}
+                className="w-full px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+              >
+                {payoutMutation.isLoading ? 'Processing...' : 'Request Withdrawal'}
+              </button>
+            </form>
+          </div>
+
+          {/* Payout History */}
+          <div className="md:col-span-2 bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Payout History</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr>
+                    <th className="py-2 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
+                    <th className="py-2 text-left text-xs font-medium text-slate-500 uppercase">Amount</th>
+                    <th className="py-2 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeData?.payoutHistory.map(payout => (
+                    <tr key={payout.id} className="border-b border-slate-100 last:border-0">
+                      <td className="py-3 text-sm text-slate-500">{formatDate(payout.date)}</td>
+                      <td className="py-3 text-sm font-medium text-slate-900">₵{payout.amount.toFixed(2)}</td>
+                      <td className="py-3 text-sm">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          payout.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {payout.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

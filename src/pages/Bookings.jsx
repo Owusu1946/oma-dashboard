@@ -209,7 +209,7 @@ export default function Bookings() {
                     {bookings.map((booking) => (
                       <tr key={booking.id}>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">
-                          <Link to={`/bookings/${booking.id}`} className="text-primary-600 hover:text-primary-900">
+                          <Link to={`/admin/bookings/${booking.id}`} className="text-primary-600 hover:text-primary-900">
                             {booking.appointment_id}
                           </Link>
                         </td>
@@ -243,7 +243,7 @@ export default function Bookings() {
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
                           <div className="flex items-center justify-end space-x-3">
-                            <Link to={`/bookings/${booking.id}`} className="text-primary-600 hover:text-primary-900">
+                            <Link to={`/admin/bookings/${booking.id}`} className="text-primary-600 hover:text-primary-900">
                               <CalendarIcon className="h-5 w-5" aria-hidden="true" />
                               <span className="sr-only">View booking {booking.appointment_id}</span>
                             </Link>

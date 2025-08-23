@@ -281,7 +281,7 @@ export default function Doctors() {
                         {pendingDoctors.map((doctor) => (
                           <tr key={doctor.id}>
                             <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">
-                              <Link to={`/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
+                              <Link to={`/admin/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
                                 {doctor.name}
                               </Link>
                             </td>
@@ -313,7 +313,7 @@ export default function Doctors() {
                                   <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
                                   <span className="sr-only">Approve {doctor.name}</span>
                                 </button>
-                                <Link to={`/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
+                                <Link to={`/admin/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
                                   <PencilIcon className="h-5 w-5" aria-hidden="true" />
                                   <span className="sr-only">Edit {doctor.name}</span>
                                 </Link>
@@ -378,7 +378,7 @@ export default function Doctors() {
                     {activeDoctors.map((doctor) => (
                       <tr key={doctor.id}>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">
-                          <Link to={`/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
+                          <Link to={`/admin/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
                             {doctor.name}
                           </Link>
                         </td>
@@ -403,7 +403,7 @@ export default function Doctors() {
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
                           <div className="flex items-center justify-end space-x-3">
-                            <Link to={`/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
+                            <Link to={`/admin/doctors/${doctor.id}`} className="text-primary-600 hover:text-primary-900">
                               <PencilIcon className="h-5 w-5" aria-hidden="true" />
                               <span className="sr-only">Edit {doctor.name}</span>
                             </Link>
