@@ -164,8 +164,9 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-lg mb-2">Doctor Access</h3>
+              <h3 className="font-semibold text-lg mb-2">Main Portal Access</h3>
               <p className="text-gray-600 mb-4">
+                The doctor portal is now the main entry point for the application. 
                 Registered doctors can access their personalized dashboard to view bookings, 
                 manage availability, and interact with patients.
               </p>
@@ -175,7 +176,7 @@ export default function Dashboard() {
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
                 >
                   <HeartIcon className="h-4 w-4 mr-2" />
-                  Access Doctor Portal
+                  Go to Main Portal
                 </Link>
                 <Link
                   to="/doctors"

@@ -25,7 +25,8 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+      {/* Main Entry Point - Redirect to Doctor Login */}
+      <Route path="/" element={<Navigate to="/doctor/login" replace />} />
       
       {/* Doctor Portal Routes */}
       <Route path="/doctor/login" element={<DoctorLogin />} />
@@ -35,7 +36,9 @@ function App() {
         </DoctorProtectedRoute>
       } />
       
-      <Route path="/" element={
+      {/* Admin Portal Routes */}
+      <Route path="/admin/login" element={!user ? <Login /> : <Navigate to="/admin" />} />
+      <Route path="/admin" element={
         <ProtectedRoute>
           <DatabaseProvider>
             <Layout />

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PhoneIcon, KeyIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -181,7 +181,7 @@ export default function DoctorLogin() {
             <PhoneIcon className="h-8 w-8 text-white" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Doctor Portal
+            OMA Health Portal
           </h2>
           <p className="text-gray-600">
             {step === 1 
@@ -309,12 +309,17 @@ export default function DoctorLogin() {
 
         {/* Footer */}
         <div className="text-center text-sm text-gray-500">
-          <p>This portal is for registered OMA Health doctors only</p>
+          <p>Welcome to OMA Health - Your Telemedicine Platform</p>
           <p className="mt-1">
             Need help? Contact{' '}
             <a href="mailto:support@omahealth.com" className="text-blue-600 hover:text-blue-500">
               support@omahealth.com
             </a>
+          </p>
+          <p className="mt-2">
+            <Link to="/admin/login" className="text-blue-600 hover:text-blue-500 underline">
+              Admin Portal Access
+            </Link>
           </p>
         </div>
       </motion.div>
