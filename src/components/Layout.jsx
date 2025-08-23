@@ -26,7 +26,6 @@ const navigation = [
   { name: 'Bookings', href: '/admin/bookings', icon: CalendarIcon },
   { name: 'Pharmacies', href: '/admin/pharmacies', icon: BuildingStorefrontIcon },
   { name: 'Doctor Portal', href: '/doctor/login', icon: HeartIcon, external: true },
-  { name: 'Doctor Registration', href: '/doctor/registration', icon: UserPlusIcon },
 ];
 
 function classNames(...classes) {
