@@ -18,13 +18,13 @@ import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Escalations', href: '/escalations', icon: ExclamationTriangleIcon },
-  { name: 'KYC Dashboard', href: '/kyc', icon: DocumentCheckIcon },
-  { name: 'Users', href: '/users', icon: UserGroupIcon },
-  { name: 'Doctors', href: '/doctors', icon: UserIcon },
-  { name: 'Bookings', href: '/bookings', icon: CalendarIcon },
-  { name: 'Pharmacies', href: '/pharmacies', icon: BuildingStorefrontIcon },
+  { name: 'Dashboard', href: '/admin', icon: HomeIcon },
+  { name: 'Escalations', href: '/admin/escalations', icon: ExclamationTriangleIcon },
+  { name: 'KYC Dashboard', href: '/admin/kyc', icon: DocumentCheckIcon },
+  { name: 'Users', href: '/admin/users', icon: UserGroupIcon },
+  { name: 'Doctors', href: '/admin/doctors', icon: UserIcon },
+  { name: 'Bookings', href: '/admin/bookings', icon: CalendarIcon },
+  { name: 'Pharmacies', href: '/admin/pharmacies', icon: BuildingStorefrontIcon },
   { name: 'Doctor Portal', href: '/doctor/login', icon: HeartIcon, external: true },
 ];
 

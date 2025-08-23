@@ -19,6 +19,7 @@ import Pharmacies from './pages/Pharmacies';
 import DoctorLogin from './pages/DoctorLogin';
 import DoctorDashboard from './pages/DoctorDashboard';
 import DoctorProtectedRoute from './components/DoctorProtectedRoute';
+import DoctorRegistration from './pages/DoctorRegistration';
 
 function App() {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ function App() {
       
       {/* Doctor Portal Routes */}
       <Route path="/doctor/login" element={<DoctorLogin />} />
+      <Route path="/doctor/register" element={<DoctorRegistration />} />
       <Route path="/doctor/dashboard" element={
         <DoctorProtectedRoute>
           <DoctorDashboard />
