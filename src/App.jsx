@@ -1,64 +1,49 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
-import { DatabaseProvider } from './contexts/DatabaseContext';
-import Dashboard from './pages/Dashboard';
-import EscalationList from './pages/EscalationList';
-import ChatViewer from './pages/ChatViewer';
-import KYCDashboard from './pages/KYCDashboard';
-import UserProfile from './pages/UserProfile';
-import Users from './pages/Users';
+import { Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
-import Layout from './components/Layout';
-import ProtectedRoute from './components/ProtectedRoute';
+import Dashboard from './pages/Dashboard';
+import Users from './pages/Users';
+import UserProfile from './pages/UserProfile';
 import Doctors from './pages/Doctors';
-import DoctorProfile from './pages/DoctorProfile';
-import Bookings from './pages/Bookings';
-import BookingDetails from './pages/BookingDetails';
 import Pharmacies from './pages/Pharmacies';
-// Doctor-specific imports
+import KYCDashboard from './pages/KYCDashboard';
+import ChatViewer from './pages/ChatViewer';
+import EscalationList from './pages/EscalationList';
+import ProtectedRoute from './components/ProtectedRoute';
+
 import DoctorLogin from './pages/DoctorLogin';
 import DoctorDashboard from './pages/DoctorDashboard';
 import DoctorProtectedRoute from './components/DoctorProtectedRoute';
+import LandingPage from './pages/LandingPage';
 import DoctorRegistration from './pages/DoctorRegistration';
 
 function App() {
-  const { user } = useAuth();
-
   return (
     <Routes>
-      {/* Main Entry Point - Redirect to Doctor Login */}
-      <Route path="/" element={<Navigate to="/doctor/login" replace />} />
+      {/* Landing Page */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Admin Routes */}
+      <Route path="/admin/login" element={<Login />} />
+      <Route path="/admin/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/admin/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+      <Route path="/admin/users/:userId" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+      <Route path="/admin/doctors" element={<ProtectedRoute><Doctors /></ProtectedRoute>} />
+      <Route path="/admin/pharmacies" element={<ProtectedRoute><Pharmacies /></ProtectedRoute>} />
+      <Route path="/admin/kyc" element={<ProtectedRoute><KYCDashboard /></ProtectedRoute>} />
+      <Route path="/admin/chat" element={<ProtectedRoute><ChatViewer /></ProtectedRoute>} />
+      <Route path="/admin/escalations" element={<ProtectedRoute><EscalationList /></ProtectedRoute>} />
       
-      {/* Doctor Portal Routes */}
+      {/* Doctor Routes */}
       <Route path="/doctor/login" element={<DoctorLogin />} />
       <Route path="/doctor/register" element={<DoctorRegistration />} />
-      <Route path="/doctor/dashboard" element={
-        <DoctorProtectedRoute>
-          <DoctorDashboard />
-        </DoctorProtectedRoute>
-      } />
-      
-      {/* Admin Portal Routes */}
-      <Route path="/admin/login" element={!user ? <Login /> : <Navigate to="/admin" />} />
-      <Route path="/admin" element={
-        <ProtectedRoute>
-          <DatabaseProvider>
-            <Layout />
-          </DatabaseProvider>
-        </ProtectedRoute>
-      }>
-        <Route index element={<Dashboard />} />
-        <Route path="escalations" element={<EscalationList />} />
-        <Route path="chat/:sessionId" element={<ChatViewer />} />
-        <Route path="kyc" element={<KYCDashboard />} />
-        <Route path="users" element={<Users />} />
-        <Route path="users/:userId" element={<UserProfile />} />
-        <Route path="doctors" element={<Doctors />} />
-        <Route path="doctors/:doctorId" element={<DoctorProfile />} />
-        <Route path="bookings" element={<Bookings />} />
-        <Route path="bookings/:bookingId" element={<BookingDetails />} />
-        <Route path="pharmacies" element={<Pharmacies />} />
-      </Route>
+      <Route 
+        path="/doctor/dashboard" 
+        element={
+          <DoctorProtectedRoute>
+            <DoctorDashboard />
+          </DoctorProtectedRoute>
+        } 
+      />
     </Routes>
   );
 }

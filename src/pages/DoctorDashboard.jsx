@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,9 +30,12 @@ import {
   ClipboardDocumentCheckIcon,
   ChevronUpIcon,
   ChevronDownIcon,
-  BanknotesIcon
+  BanknotesIcon,
+  CreditCardIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { usePDF } from 'react-to-pdf';
 // import { mockDoctorAPI } from '../utils/mockDoctorAPI';
 const DB_API_URL = import.meta.env.VITE_DB_API_URL || import.meta.env.VITE_API_URL;
 const API_BASE = (DB_API_URL || 'https://oma-db-service-pcxd.onrender.com').replace(/\/+$/,'');
@@ -65,6 +68,16 @@ const fetchDoctorBookings = async ({ queryKey }) => {
   return response.json();
 };
 
+const fetchDoctorPrescriptions = async () => {
+  const token = localStorage.getItem('doctorToken');
+  if (!token) throw new Error('No auth token found');
+  const response = await fetch(`${API_BASE}/doctor/prescriptions`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch prescriptions');
+  return response.json();
+};
+
 const fetchDoctorFinance = async () => {
   // MOCK API: Replace with real API call
   console.log('[MOCK_API] Fetching doctor finance data...');
@@ -76,15 +89,27 @@ const fetchDoctorFinance = async () => {
       { id: 'p1', date: '2025-08-15T10:00:00.000Z', amount: 400.00, status: 'Completed' },
       { id: 'p2', date: '2025-07-28T14:30:00.000Z', amount: 350.50, status: 'Completed' },
       { id: 'p3', date: '2025-07-12T09:00:00.000Z', amount: 500.00, status: 'Completed' },
-    ]
+    ],
+    paymentMethod: null, // Start with no payment method
   }), 500));
 };
 
-const requestPayout = async (amount) => {
+const requestPayout = async ({ amount, paymentMethod }) => {
   // MOCK API: Replace with real API call
-  console.log(`[MOCK_API] Requesting payout for amount: ${amount}`);
+  console.log(`[MOCK_API] Requesting payout for amount: ${amount} to ${paymentMethod.provider} (${paymentMethod.number})`);
   if (amount <= 0) throw new Error('Invalid amount');
-  return new Promise(resolve => setTimeout(() => resolve({ success: true, newBalance: 780.50 - amount }), 1000));
+  // In a real app, this would create a 'pending' transaction in the DB
+  return new Promise(resolve => setTimeout(() => resolve({ 
+    success: true, 
+    newBalance: 780.50 - amount,
+    newPayout: { id: `p${Date.now()}`, date: new Date().toISOString(), amount, status: 'Pending' }
+  }), 1000));
+};
+
+const savePaymentMethod = async (paymentMethod) => {
+  // MOCK API: Replace with real API call
+  console.log(`[MOCK_API] Saving payment method:`, paymentMethod);
+  return new Promise(resolve => setTimeout(() => resolve({ success: true, paymentMethod }), 1000));
 };
 
 
@@ -95,6 +120,7 @@ const requestPayout = async (amount) => {
 export default function DoctorDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const notificationsButtonRef = useRef(null);
 
   // State
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -102,6 +128,38 @@ export default function DoctorDashboard() {
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
   const [meetLink, setMeetLink] = useState('');
   const [copied, setCopied] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [pdfData, setPdfData] = useState(null);
+  const { toPDF, targetRef } = usePDF({
+    filename: 'e-prescription.pdf',
+    page: { format: 'a4', orientation: 'portrait' },
+    html2canvas: { useCORS: true, scale: 2 }
+  });
+
+  // Mock notifications data
+  const mockNotifications = [
+    { id: 1, type: 'booking', message: 'New booking from John Doe.', time: '2m ago', read: false },
+    { id: 2, type: 'payment', message: 'Payout of ₵400.00 processed.', time: '1h ago', read: false },
+    { id: 3, type: 'reminder', message: 'Upcoming appointment with Jane Smith in 30 minutes.', time: '1d ago', read: true },
+    { id: 4, type: 'system', message: 'Your profile has been updated.', time: '2d ago', read: true },
+  ];
+
+  // Close notifications panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        notificationsOpen &&
+        notificationsButtonRef.current &&
+        !notificationsButtonRef.current.contains(event.target)
+      ) {
+        setNotificationsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notificationsOpen]);
 
   // Check auth on component mount
   useEffect(() => {
@@ -128,6 +186,11 @@ export default function DoctorDashboard() {
   const { data: initialBookingsData } = useQuery({
     queryKey: ['bookings', { page: 1, limit: 5, sortField: 'consultation_date', sortOrder: 'desc' }],
     queryFn: fetchDoctorBookings,
+  });
+
+  const { data: initialPrescriptionsData } = useQuery({
+    queryKey: ['prescriptions'],
+    queryFn: fetchDoctorPrescriptions,
   });
 
   // Mutations for doctor actions
@@ -206,10 +269,14 @@ export default function DoctorDashboard() {
     totalEarnings: initialBookingsData.earnings,
   } : { totalBookings: 0, pendingBookings: 0, completedBookings: 0, totalEarnings: 0 };
   
+  const prescriptionStats = initialPrescriptionsData ? {
+    pending: initialPrescriptionsData.pending,
+  } : { pending: 0 };
+  
   const sidebarItems = [
     { id: 'dashboard', name: 'Dashboard', icon: HomeIcon },
     { id: 'bookings', name: 'Bookings', icon: CalendarDaysIcon, badge: stats.pendingBookings },
-    { id: 'prescriptions', name: 'Prescriptions', icon: DocumentTextIcon },
+    { id: 'prescriptions', name: 'Prescriptions', icon: DocumentTextIcon, badge: prescriptionStats.pending },
     { id: 'availability', name: 'Availability', icon: CalendarIcon },
     { id: 'finance', name: 'Finance', icon: BanknotesIcon },
     { id: 'analytics', name: 'Analytics', icon: ChartBarIcon },
@@ -441,15 +508,47 @@ export default function DoctorDashboard() {
               </div>
               
               <div className="flex items-center space-x-4">
-                <button className="p-2 text-slate-500 hover:text-slate-700 relative">
+                <div className="relative" ref={notificationsButtonRef}>
+                  <button
+                    onClick={() => setNotificationsOpen(!notificationsOpen)}
+                    className="p-2 text-slate-500 hover:text-slate-700 relative"
+                  >
                   <BellIcon className="w-5 h-5" />
-                  {/* Notifications are not managed by React Query yet, so this badge will not update automatically */}
-                  {/* For now, it's a placeholder. In a real app, you'd manage notifications state here */}
-                  {/* Example: const { data: notifications } = useQuery({ queryKey: ['notifications'] }); */}
-                  {/* {notifications?.length > 0 && ( */}
-                  {/*   <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span> */}
-                  {/* )} */}
+                    {mockNotifications.some(n => !n.read) && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                    )}
                 </button>
+                  <AnimatePresence>
+                    {notificationsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden z-50"
+                      >
+                        <div className="p-4 border-b border-slate-100">
+                          <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
+              </div>
+                        <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                          {mockNotifications.map(notification => (
+                            <div key={notification.id} className={`p-4 hover:bg-slate-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''}`}>
+                              <p className="text-sm text-slate-800">{notification.message}</p>
+                              <p className="text-xs text-slate-400 mt-1">{notification.time}</p>
+                            </div>
+                          ))}
+                           {mockNotifications.length === 0 && (
+                            <p className="p-4 text-sm text-slate-500 text-center">No new notifications.</p>
+                          )}
+                        </div>
+                        <div className="p-2 bg-slate-50 border-t border-slate-100 text-center">
+                          <button className="text-sm font-medium text-slate-600 hover:text-slate-900">
+                            View all notifications
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
           </div>
@@ -513,6 +612,11 @@ export default function DoctorDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Hidden component for PDF generation */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        {pdfData && <PrescriptionPDF prescription={pdfData} doctor={doctor} targetRef={targetRef} />}
+      </div>
     </div>
   );
 
@@ -697,32 +801,36 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/60 overflow-x-auto">
+        <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden">
           {isLoading ? (
-            <p className="p-6 text-center text-slate-500">Loading bookings...</p>
+            <BookingsTableSkeleton />
           ) : isError ? (
             <p className="p-6 text-center text-red-500">Error: {error.message}</p>
           ) : (
             <>
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="hidden md:table-header-group bg-slate-50 border-b border-slate-200/60">
                   <tr>
                     <SortableHeader field="users.first_name">Patient</SortableHeader>
                     <SortableHeader field="consultation_date">Date</SortableHeader>
                     <SortableHeader field="status">Status</SortableHeader>
-                    <th className="py-3 px-4 text-left text-sm font-semibold text-slate-900">Actions</th>
+                      <th className="py-3 px-6 text-left text-sm font-semibold text-slate-900">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                  <tbody className="md:divide-y md:divide-slate-100">
                   {bookingsData?.bookings.map((booking) => (
-                    <tr key={booking.id}>
-                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-sm font-medium text-slate-900">
-                        {booking.users?.first_name || 'Patient'}
+                      <tr key={booking.id} className="block md:table-row border-b last:border-b-0 border-slate-100 md:border-none">
+                        <td className="p-4 md:px-6 md:py-4 md:whitespace-nowrap text-sm flex justify-between items-center md:table-cell">
+                          <strong className="md:hidden text-slate-600">Patient</strong>
+                          <span className="font-medium text-slate-900 text-right md:text-left">{booking.users?.first_name || 'Patient'}</span>
                       </td>
-                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-sm text-slate-500">
-                        {booking.consultation_date ? formatDate(booking.consultation_date) : 'Date not set'}
+                        <td className="p-4 pt-0 md:px-6 md:py-4 md:whitespace-nowrap text-sm text-slate-500 flex justify-between items-center md:table-cell">
+                          <strong className="md:hidden text-slate-600">Date</strong>
+                          <span>{booking.consultation_date ? formatDate(booking.consultation_date) : 'Date not set'}</span>
                       </td>
-                      <td className="whitespace-nowrap py-4 pl-3 pr-4 text-sm">
+                        <td className="p-4 pt-0 md:px-6 md:py-4 md:whitespace-nowrap text-sm flex justify-between items-center md:table-cell">
+                          <strong className="md:hidden text-slate-600">Status</strong>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
                           booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
@@ -732,7 +840,8 @@ export default function DoctorDashboard() {
                           {booking.status}
                         </span>
                       </td>
-                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        <td className="p-4 pt-2 md:px-6 md:py-4 md:whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-2 justify-end">
                         {booking.status === 'pending' && (
                           <>
                             <button 
@@ -771,7 +880,7 @@ export default function DoctorDashboard() {
                               await actOnBooking(booking.id, 'start', { call_room_url: room || undefined, consultation_mode: 'video' });
                             }} 
                             disabled={mutation.isLoading} 
-                            className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-2"
+                                className="px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-2"
                           >
                             <PlayIcon className="w-4 h-4" />
                             <span>Start</span>
@@ -780,11 +889,13 @@ export default function DoctorDashboard() {
                         {booking.status === 'completed' && (
                           <span className="text-sm text-slate-400">Completed</span>
                         )}
+                          </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
               <div className="p-4 flex items-center justify-between">
                 <button
                   onClick={() => setPage(p => Math.max(p - 1, 1))}
@@ -814,6 +925,8 @@ export default function DoctorDashboard() {
   // Prescriptions view component
   function PrescriptionsView() {
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [patientToConfirm, setPatientToConfirm] = useState(null);
     const [newPrescription, setNewPrescription] = useState({
       user_id: '',
       patient_phone: '',
@@ -821,6 +934,171 @@ export default function DoctorDashboard() {
       delivery_address: '',
       notes: ''
     });
+
+    const { data: prescriptionsData, isLoading, isError, error } = useQuery({
+      queryKey: ['prescriptions'],
+      queryFn: fetchDoctorPrescriptions,
+    });
+
+    const findPatientMutation = useMutation({
+      mutationFn: async (phoneNumber) => {
+        const token = localStorage.getItem('doctorToken');
+        const userResp = await fetch(`${API_BASE}/users/phone/${normalizeDbPhoneNumber(phoneNumber)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!userResp.ok) {
+          if (userResp.status === 404) throw new Error('Patient not found with this phone number.');
+          const errorData = await userResp.json().catch(() => ({ error: 'Failed to fetch patient details.' }));
+          throw new Error(errorData.error);
+        }
+        return userResp.json();
+      },
+      onSuccess: (patient) => {
+        setPatientToConfirm(patient);
+        setIsConfirmModalOpen(true);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      }
+    });
+
+    const normalizeDbPhoneNumber = (phoneNumber) => {
+      let cleaned = String(phoneNumber).replace(/\D/g, '');
+      if (cleaned.startsWith('0')) {
+        cleaned = '233' + cleaned.substring(1);
+      }
+      return cleaned;
+    };
+
+    const sendEmailMutation = useMutation({
+      mutationFn: async (emailData) => {
+        console.log('[E-Prescription] Step 5: Firing API call to backend with data:', { ...emailData, pdfBase64: '...' });
+        const token = localStorage.getItem('doctorToken');
+        const resp = await fetch(`${API_BASE}/doctor/prescriptions/send-email`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(emailData)
+        });
+        if (!resp.ok) {
+          const errorData = await resp.json();
+          console.error('[E-Prescription] Error from backend API:', errorData);
+          throw new Error(errorData.error || 'Failed to send email');
+        }
+        console.log('[E-Prescription] Step 8: Received successful response from backend.');
+        return resp.json();
+      },
+      onSuccess: () => {
+        toast.success('E-Prescription sent to patient successfully!');
+        setPdfData(null);
+      },
+      onError: (error) => {
+        toast.error(`Failed to send email: ${error.message}`);
+        setPdfData(null);
+      }
+    });
+
+    const createPrescriptionMutation = useMutation({
+      mutationFn: async (prescriptionData) => {
+        const token = localStorage.getItem('doctorToken');
+        // User is already fetched and confirmed.
+        const payload = {
+          user_id: prescriptionData.user_id,
+          medications: prescriptionData.medications.filter(m => m.name),
+          delivery_address: prescriptionData.delivery_address,
+          notes: prescriptionData.notes
+        };
+
+        const resp = await fetch(`${API_BASE}/doctor/prescriptions`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`, 
+            'Content-Type': 'application/json' 
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+          const errorData = await resp.json();
+          throw new Error(errorData.error || 'Failed to create prescription');
+        }
+        const newPrescription = await resp.json();
+
+        // Enrich the prescription object for the PDF and email
+        return {
+          ...newPrescription,
+          patient: patientToConfirm, // Use patient data from state
+          prescription_items: payload.medications,
+        };
+      },
+      onSuccess: (prescriptionWithDetails) => {
+        toast.success('Prescription created successfully');
+        queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+        
+        console.log('[E-Prescription] Step 1: Prescription created. Preparing to generate PDF.', prescriptionWithDetails);
+        setPdfData(prescriptionWithDetails);
+
+        setShowCreateForm(false);
+        setIsConfirmModalOpen(false);
+        setPatientToConfirm(null);
+        setNewPrescription({
+          user_id: '',
+          patient_phone: '',
+          medications: [{ name: '', dosage: '', quantity: '', instructions: '' }],
+          delivery_address: '',
+          notes: ''
+        });
+      },
+      onError: (error) => {
+        console.error('Create prescription error:', error);
+        toast.error(error.message);
+      }
+    });
+
+    useEffect(() => {
+      if (pdfData && targetRef.current) {
+        console.log('[E-Prescription] Step 2: `pdfData` updated and `targetRef` is available. Generating PDF.');
+        // use a small timeout to let the component render with new data
+        setTimeout(() => {
+          toPDF().then((blob) => {
+            console.log('[E-Prescription] Step 3: PDF blob generated successfully.', blob);
+            if (!blob) {
+              throw new Error("PDF generation failed, returned blob is empty.");
+            }
+            if (!pdfData.patient?.email) {
+              toast.error("Patient does not have an email address on file.");
+              console.error('[E-Prescription] Error: Patient email is missing from patient object:', pdfData.patient);
+              setPdfData(null);
+              return;
+            }
+            console.log(`[E-Prescription] Patient email found: ${pdfData.patient.email}. Preparing to convert blob to Base64.`);
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = () => {
+              const base64data = reader.result;
+              console.log('[E-Prescription] Step 4: PDF converted to Base64. Calling send-email mutation.');
+              sendEmailMutation.mutate({
+                userEmail: pdfData.patient.email,
+                userName: pdfData.patient.first_name,
+                doctorName: doctor.name,
+                pdfBase64: base64data.split(',')[1], // remove data URI part
+              });
+            };
+            reader.onerror = (error) => {
+              console.error('[E-Prescription] Error converting blob to Base64:', error);
+              toast.error('Failed to process PDF for emailing.');
+              setPdfData(null);
+            };
+          }).catch(err => {
+            console.error('[E-Prescription] Error during `toPDF()` generation:', err);
+            toast.error('Failed to generate PDF.');
+            setPdfData(null);
+          });
+        }, 500);
+      }
+    }, [pdfData, doctor, toPDF, targetRef, sendEmailMutation]);
 
     const addMedication = () => {
       setNewPrescription(prev => ({
@@ -845,63 +1123,32 @@ export default function DoctorDashboard() {
       }));
     };
 
-    const handleCreatePrescription = async () => {
-      if (!newPrescription.patient_phone || newPrescription.medications.some(m => !m.name)) {
-        toast.error('Please fill in all required fields');
+    const handleFindPatientSubmit = () => {
+      if (!newPrescription.patient_phone) {
+        toast.error('Patient phone number is required.');
         return;
       }
-
-      try {
-        // First, find user by phone number
-        const token = localStorage.getItem('doctorToken');
-        const userResp = await fetch(`${API_BASE}/users/phone/${newPrescription.patient_phone}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (!userResp.ok) {
-          toast.error('Patient not found with this phone number');
-          return;
-        }
-
-        const user = await userResp.json();
-        
-        const prescriptionData = {
-          user_id: user.id,
-          medications: newPrescription.medications.filter(m => m.name),
-          delivery_address: newPrescription.delivery_address,
-          notes: newPrescription.notes
-        };
-
-        const resp = await fetch(`${API_BASE}/doctor/prescriptions`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${token}`, 
-            'Content-Type': 'application/json' 
-          },
-          body: JSON.stringify(prescriptionData)
-        });
-
-        if (!resp.ok) throw new Error('Failed to create prescription');
-        
-        queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
-        toast.success('Prescription created successfully');
-
-        setShowCreateForm(false);
-        setNewPrescription({
-          user_id: '',
-          patient_phone: '',
-          medications: [{ name: '', dosage: '', quantity: '', instructions: '' }],
-          delivery_address: '',
-          notes: ''
-        });
-      } catch (error) {
-        console.error('Create prescription error:', error);
-        toast.error('Failed to create prescription');
+      if (newPrescription.medications.every(m => !m.name)) {
+        toast.error('At least one medication name is required.');
+        return;
       }
+      findPatientMutation.mutate(newPrescription.patient_phone);
+    };
+
+    const handleConfirmAndCreate = () => {
+      if (!patientToConfirm) return;
+      
+      const prescriptionPayload = {
+        ...newPrescription,
+        user_id: patientToConfirm.id,
+      };
+      
+      createPrescriptionMutation.mutate(prescriptionPayload);
     };
 
     if (showCreateForm) {
       return (
+        <>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-slate-900">New Prescription</h2>
@@ -1016,16 +1263,28 @@ export default function DoctorDashboard() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleCreatePrescription}
-                  disabled={mutation.isLoading}
+                    onClick={handleFindPatientSubmit}
+                    disabled={findPatientMutation.isLoading}
                   className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
                 >
-                  {mutation.isLoading ? 'Creating...' : 'Create Prescription'}
+                    {findPatientMutation.isLoading ? 'Finding Patient...' : 'Find Patient & Continue'}
                 </button>
               </div>
             </div>
           </div>
         </div>
+          
+          <PatientConfirmModal
+            isOpen={isConfirmModalOpen}
+            patient={patientToConfirm}
+            onClose={() => {
+              setIsConfirmModalOpen(false);
+              setPatientToConfirm(null);
+            }}
+            onConfirm={handleConfirmAndCreate}
+            isLoading={createPrescriptionMutation.isLoading}
+          />
+        </>
       );
     }
 
@@ -1043,61 +1302,65 @@ export default function DoctorDashboard() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/60">
-          {/* This section will be updated to use React Query for prescriptions */}
-          {/* For now, it will show a placeholder or the last few from mock */}
-          {/* In a real app, you'd fetch prescriptions from the API */}
-          {/* Example: const { data: prescriptions } = useQuery({ queryKey: ['prescriptions'] }); */}
-          {/* {prescriptions?.map((prescription, index) => ( */}
-          {/*   <motion.div */}
-          {/*     key={prescription.id} */}
-          {/*     initial={{ opacity: 0, y: 20 }} */}
-          {/*     animate={{ opacity: 1, y: 0 }} */}
-          {/*     transition={{ duration: 0.3, delay: index * 0.05 }} */}
-          {/*     className="p-6 hover:bg-slate-50/50 transition-colors" */}
-          {/*   > */}
-          {/*     <div className="flex items-start justify-between"> */}
-          {/*       <div className="flex-1"> */}
-          {/*         <div className="flex items-center space-x-3 mb-2"> */}
-          {/*           <h4 className="font-medium text-slate-900"> */}
-          {/*             {prescription.patient?.first_name || 'Patient'} */}
-          {/*           </h4> */}
-          {/*           <span className="text-sm text-slate-500"> */}
-          {/*             #{prescription.reference_id} */}
-          {/*           </span> */}
-          {/*           <span className={`px-2 py-1 text-xs font-medium rounded-full ${ */}
-          {/*             prescription.status === 'fulfilled' ? 'bg-emerald-100 text-emerald-700' : */}
-          {/*             prescription.status === 'processing' ? 'bg-blue-100 text-blue-700' : */}
-          {/*             'bg-amber-100 text-amber-700' */}
-          {/*           }`}> */}
-          {/*             {prescription.status} */}
-          {/*           </span> */}
-          {/*         </div> */}
-          {/*         <p className="text-sm text-slate-500 mb-2"> */}
-          {/*           Created: {new Date(prescription.created_at).toLocaleDateString()} */}
-          {/*         </p> */}
-          {/*         {prescription.prescription_items && ( */}
-          {/*           <div className="text-sm text-slate-600"> */}
-          {/*             <p className="font-medium mb-1">Medications:</p> */}
-          {/*             <ul className="list-disc list-inside"> */}
-          {/*               {prescription.prescription_items.map((item, idx) => ( */}
-          {/*                 <li key={idx}> */}
-          {/*                   {item.medication_name} - {item.dosage} (Qty: {item.quantity}) */}
-          {/*                 </li> */}
-          {/*               ))} */}
-          {/*             </ul> */}
-          {/*           </div> */}
-          {/*         )} */}
-          {/*       </div> */}
-          {/*        */}
-          {/*       <div className="flex items-center space-x-2"> */}
-          {/*         <span className="text-sm text-slate-400"> */}
-          {/*           {prescription.pharmacy?.name || 'No pharmacy assigned'} */}
-          {/*         </span> */}
-          {/*       </div> */}
-          {/*     </div> */}
-          {/*   </motion.div> */}
-          {/* ))} */}
-          <p className="text-slate-500 text-center">Prescriptions data will be updated with React Query.</p>
+          {isLoading ? (
+            <p className="p-6 text-center text-slate-500">Loading prescriptions...</p>
+          ) : isError ? (
+            <p className="p-6 text-center text-red-500">Error: {error.message}</p>
+          ) : (
+            (prescriptionsData?.prescriptions || []).map((prescription, index) => (
+              <motion.div
+                key={prescription.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                className="p-6 hover:bg-slate-50/50 transition-colors border-b last:border-b-0 border-slate-100"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h4 className="font-medium text-slate-900">
+                        {prescription.patient?.first_name || 'Patient'}
+                      </h4>
+                      <span className="text-sm text-slate-500">
+                        #{prescription.reference_id}
+                      </span>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        prescription.status === 'fulfilled' ? 'bg-emerald-100 text-emerald-700' :
+                        prescription.status === 'processing' ? 'bg-blue-100 text-blue-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {prescription.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 mb-2">
+                      Created: {new Date(prescription.created_at).toLocaleDateString()}
+                    </p>
+                    {prescription.prescription_items && (
+                      <div className="text-sm text-slate-600">
+                        <p className="font-medium mb-1">Medications:</p>
+                        <ul className="list-disc list-inside">
+                          {prescription.prescription_items.map((item, idx) => (
+                            <li key={idx}>
+                              {item.medication_name} - {item.dosage} (Qty: {item.quantity})
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-slate-400">
+                      {prescription.pharmacy?.name || 'No pharmacy assigned'}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
+          {prescriptionsData?.prescriptions?.length === 0 && !isLoading && (
+            <p className="p-6 text-center text-slate-500">No prescriptions found.</p>
+          )}
         </div>
       </div>
     );
@@ -1260,6 +1523,52 @@ export default function DoctorDashboard() {
 
   // Profile view component
   function ProfileView() {
+    const [editableProfile, setEditableProfile] = useState(null);
+
+    useEffect(() => {
+      if (doctor) {
+        setEditableProfile({ ...doctor });
+      }
+    }, [doctor]);
+
+    const handleProfileChange = (e) => {
+      const { name, value } = e.target;
+      setEditableProfile(prev => (prev ? { ...prev, [name]: value } : null));
+    };
+
+    const handleProfileSave = () => {
+      if (!editableProfile) return;
+      
+      const {
+        // Exclude non-editable fields before sending to the API
+        id,
+        consultation_fee,
+        currency,
+        availability_status,
+        profile_image_url,
+        created_at,
+        password_hash,
+        password_salt,
+        is_active,
+        registration_status,
+        ...updateData
+      } = editableProfile;
+
+      mutation.mutate({
+        url: `${API_BASE}/doctor/me`,
+        method: 'PUT',
+        body: updateData,
+      });
+    };
+
+    if (!editableProfile) {
+      return (
+        <div className="text-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mx-auto"></div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6">
         <h2 className="text-xl font-semibold text-slate-900">Profile Settings</h2>
@@ -1267,52 +1576,71 @@ export default function DoctorDashboard() {
         <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
+              <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
               <input
+                id="name"
+                name="name"
                 type="text"
-                defaultValue={doctor?.name || ''}
+                value={editableProfile.name || ''}
+                onChange={handleProfileChange}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Specialty</label>
+              <label htmlFor="specialty" className="block text-sm font-medium text-slate-700 mb-2">Specialty</label>
               <input
+                id="specialty"
+                name="specialty"
                 type="text"
-                defaultValue={doctor?.specialty || ''}
+                value={editableProfile.specialty || ''}
+                onChange={handleProfileChange}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
+              <label htmlFor="phone_number" className="block text-sm font-medium text-slate-700 mb-2">Phone Number</label>
               <input
+                id="phone_number"
+                name="phone_number"
                 type="tel"
-                defaultValue={doctor?.phone_number || ''}
+                value={editableProfile.phone_number || ''}
+                onChange={handleProfileChange}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Consultation Fee (₵)</label>
+              <label htmlFor="consultation_fee" className="block text-sm font-medium text-slate-700 mb-2">Consultation Fee (₵)</label>
               <input
+                id="consultation_fee"
+                name="consultation_fee"
                 type="number"
-                defaultValue={doctor?.consultation_fee || ''}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                value={editableProfile.consultation_fee || ''}
+                disabled // This field is not editable
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 text-slate-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Bio</label>
+              <label htmlFor="bio" className="block text-sm font-medium text-slate-700 mb-2">Bio</label>
               <textarea
+                id="bio"
+                name="bio"
                 rows={4}
-                defaultValue={doctor?.bio || ''}
+                value={editableProfile.bio || ''}
+                onChange={handleProfileChange}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
 
-            <button className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
-              Save Changes
+            <button
+              onClick={handleProfileSave}
+              disabled={mutation.isLoading}
+              className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              {mutation.isLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>
@@ -1372,6 +1700,7 @@ export default function DoctorDashboard() {
   // Finance view component
   function FinanceView() {
     const [payoutAmount, setPayoutAmount] = useState('');
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
     const { data: financeData, isLoading } = useQuery({
       queryKey: ['doctorFinance'],
@@ -1380,9 +1709,16 @@ export default function DoctorDashboard() {
     
     const payoutMutation = useMutation({
       mutationFn: requestPayout,
-      onSuccess: () => {
+      onSuccess: (data) => {
         toast.success('Payout request submitted successfully!');
-        queryClient.invalidateQueries({ queryKey: ['doctorFinance'] });
+        queryClient.setQueryData(['doctorFinance'], (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            availableForPayout: data.newBalance,
+            payoutHistory: [data.newPayout, ...oldData.payoutHistory],
+          };
+        });
         setPayoutAmount('');
       },
       onError: (error) => {
@@ -1390,14 +1726,35 @@ export default function DoctorDashboard() {
       }
     });
 
+    const paymentMethodMutation = useMutation({
+      mutationFn: savePaymentMethod,
+      onSuccess: (data) => {
+        toast.success('Payment method saved!');
+        queryClient.setQueryData(['doctorFinance'], (oldData) => ({
+          ...oldData,
+          paymentMethod: data.paymentMethod,
+        }));
+        setIsPaymentModalOpen(false);
+      },
+      onError: (error) => {
+        toast.error(`Failed to save method: ${error.message}`);
+      },
+    });
+
     const handlePayoutRequest = (e) => {
       e.preventDefault();
+      
+      if (!financeData?.paymentMethod) {
+        setIsPaymentModalOpen(true);
+        return;
+      }
+
       const amount = parseFloat(payoutAmount);
       if (!amount || amount <= 0 || amount > financeData?.availableForPayout) {
         toast.error('Please enter a valid amount within your available balance.');
         return;
       }
-      payoutMutation.mutate(amount);
+      payoutMutation.mutate({ amount, paymentMethod: financeData.paymentMethod });
     };
 
     if (isLoading) {
@@ -1405,6 +1762,7 @@ export default function DoctorDashboard() {
     }
 
     return (
+      <>
       <div className="space-y-6">
         <h2 className="text-xl font-semibold text-slate-900">Finance Overview</h2>
 
@@ -1442,12 +1800,22 @@ export default function DoctorDashboard() {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>
+                {financeData?.paymentMethod && (
+                  <div className="text-xs text-slate-500">
+                    Payout to: {financeData.paymentMethod.provider} ({financeData.paymentMethod.number})
+                    <button type="button" onClick={() => setIsPaymentModalOpen(true)} className="ml-2 text-blue-600 hover:underline">Change</button>
+                  </div>
+                )}
               <button
                 type="submit"
                 disabled={payoutMutation.isLoading}
                 className="w-full px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
               >
-                {payoutMutation.isLoading ? 'Processing...' : 'Request Withdrawal'}
+                  {payoutMutation.isLoading
+                    ? 'Processing...'
+                    : financeData?.paymentMethod
+                    ? 'Request Withdrawal'
+                    : 'Add Payment Method'}
               </button>
             </form>
           </div>
@@ -1471,7 +1839,9 @@ export default function DoctorDashboard() {
                       <td className="py-3 text-sm font-medium text-slate-900">₵{payout.amount.toFixed(2)}</td>
                       <td className="py-3 text-sm">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          payout.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            payout.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                            payout.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                            'bg-slate-100 text-slate-600'
                         }`}>
                           {payout.status}
                         </span>
@@ -1484,6 +1854,293 @@ export default function DoctorDashboard() {
           </div>
         </div>
       </div>
+        
+        <PaymentMethodModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          onSave={paymentMethodMutation.mutate}
+          isLoading={paymentMethodMutation.isLoading}
+          currentMethod={financeData?.paymentMethod}
+        />
+      </>
     );
   }
+}
+
+// ==================================
+// Shimmer Loading Skeleton
+// ==================================
+function BookingsTableSkeleton() {
+  return (
+    <div>
+      {/* Mobile skeleton */}
+      <div className="md:hidden">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="p-4 border-b border-slate-100 animate-pulse">
+            <div className="flex justify-between items-center mb-3">
+              <div className="h-4 bg-slate-200 rounded w-2/5"></div>
+              <div className="h-5 bg-slate-200 rounded-full w-20"></div>
+            </div>
+            <div className="h-4 bg-slate-200 rounded w-3/5 mb-4"></div>
+            <div className="flex space-x-2 justify-end">
+              <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
+              <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Desktop skeleton */}
+      <div className="hidden md:block">
+        <table className="min-w-full">
+          <thead className="bg-slate-50 border-b border-slate-200/60">
+            <tr>
+              <th className="py-3 px-6 text-left text-sm font-semibold text-slate-400">Patient</th>
+              <th className="py-3 px-6 text-left text-sm font-semibold text-slate-400">Date</th>
+              <th className="py-3 px-6 text-left text-sm font-semibold text-slate-400">Status</th>
+              <th className="py-3 px-6 text-left text-sm font-semibold text-slate-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(5)].map((_, i) => (
+              <tr key={i} className="border-b border-slate-100 last:border-b-0 animate-pulse">
+                <td className="py-4 px-6"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
+                <td className="py-4 px-6"><div className="h-4 bg-slate-200 rounded w-40"></div></td>
+                <td className="py-4 px-6"><div className="h-6 bg-slate-200 rounded-full w-20"></div></td>
+                <td className="py-4 px-6">
+                  <div className="flex items-center space-x-2">
+                    <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
+                    <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
+                    <div className="h-8 w-8 bg-slate-200 rounded-lg"></div>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ==================================
+// Payment Method Modal Component
+// ==================================
+function PaymentMethodModal({ isOpen, onClose, onSave, isLoading, currentMethod }) {
+  const [provider, setProvider] = useState(currentMethod?.provider || 'MTN Mobile Money');
+  const [number, setNumber] = useState(currentMethod?.number || '');
+
+  useEffect(() => {
+    if (currentMethod) {
+      setProvider(currentMethod.provider);
+      setNumber(currentMethod.number);
+    } else {
+      setProvider('MTN Mobile Money');
+      setNumber('');
+    }
+  }, [currentMethod, isOpen]);
+
+  const handleSave = () => {
+    if (!number.trim()) {
+      toast.error('Please enter a valid mobile money number.');
+      return;
+    }
+    onSave({ provider, number });
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-8"
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CreditCardIcon className="w-8 h-8 text-slate-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Payment Method</h2>
+              <p className="text-slate-600 mb-6">
+                Add your mobile money details for withdrawals.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="provider" className="block text-sm font-medium text-slate-700 mb-2">Provider</label>
+                <select
+                  id="provider"
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                >
+                  <option>MTN Mobile Money</option>
+                  <option>Telecel Cash</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="number" className="block text-sm font-medium text-slate-700 mb-2">Mobile Number</label>
+                <input
+                  type="tel"
+                  id="number"
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
+                  placeholder="024 123 4567"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isLoading}
+                className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+              >
+                {isLoading ? 'Saving...' : 'Save Method'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ==================================
+// E-Prescription PDF Component
+// ==================================
+const PrescriptionPDF = ({ prescription, doctor, targetRef }) => {
+  if (!prescription || !doctor) return null;
+
+  return (
+    <div ref={targetRef} className="p-8 text-slate-800 bg-white" style={{ width: '210mm', minHeight: '297mm', fontFamily: 'sans-serif' }}>
+      {/* Header */}
+      <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">OMA Health</h1>
+          <p className="text-slate-500">Your Trusted Telemedicine Partner</p>
+        </div>
+        {/* Using a public, static PNG to avoid PDF generation errors */}
+        <img src="https://i.imgur.com/8Yf4Z3j.png" crossOrigin="anonymous" alt="OMA Health Logo" style={{ width: '64px', height: '64px' }} />
+      </div>
+
+      {/* Doctor & Patient Info */}
+      <div className="grid grid-cols-2 gap-8 my-8">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Dr. {doctor.name}</h2>
+          <p className="text-sm text-slate-600">{doctor.specialty}</p>
+          <p className="text-sm text-slate-600">{doctor.phone_number}</p>
+        </div>
+        <div className="text-right">
+          <h2 className="text-lg font-semibold text-slate-900">Patient: {prescription.patient?.first_name || 'N/A'}</h2>
+          <p className="text-sm text-slate-600">Date: {new Date(prescription.created_at).toLocaleDateString()}</p>
+          <p className="text-sm text-slate-600">Reference ID: {prescription.reference_id}</p>
+        </div>
+      </div>
+
+      {/* Prescription Body */}
+      <div>
+        <h2 className="text-xl font-bold text-center mb-6 py-2 bg-slate-100 rounded-lg">E-Prescription (Rx)</h2>
+        <div className="space-y-4">
+          {prescription.prescription_items?.map((item, index) => (
+            <div key={index} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
+              <p className="font-semibold text-lg text-slate-800">{item.medication_name}</p>
+              <div className="grid grid-cols-2 mt-2 text-sm">
+                <p><strong className="font-medium text-slate-600">Dosage:</strong> {item.dosage}</p>
+                <p><strong className="font-medium text-slate-600">Quantity:</strong> {item.quantity}</p>
+              </div>
+              <p className="mt-2"><strong className="font-medium text-slate-600">Instructions:</strong> {item.instructions}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-12 pt-4 border-t border-slate-200 text-center text-xs text-slate-500">
+        <p>This is a digitally generated prescription and does not require a physical signature.</p>
+        <p>&copy; {new Date().getFullYear()} OMA Health. All rights reserved.</p>
+      </div>
+    </div>
+  );
+};
+
+// ==================================
+// Patient Confirmation Modal
+// ==================================
+function PatientConfirmModal({ isOpen, patient, onClose, onConfirm, isLoading }) {
+  if (!isOpen || !patient) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-8"
+      >
+        <div className="text-center">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <UserCircleIcon className="w-8 h-8 text-slate-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Confirm Patient</h2>
+          <p className="text-slate-600 mb-6">
+            Please confirm this is the correct patient before creating a prescription.
+          </p>
+        </div>
+
+        <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm">
+          <div className="flex justify-between">
+            <span className="font-medium text-slate-600">Name:</span>
+            <span className="font-semibold text-slate-800">{patient.first_name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-medium text-slate-600">Phone:</span>
+            <span className="text-slate-800">{patient.phone_number}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-medium text-slate-600">Email:</span>
+            <span className="text-slate-800">{patient.email || 'N/A'}</span>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isLoading}
+            className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? 'Creating...' : 'Confirm & Create'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 }
