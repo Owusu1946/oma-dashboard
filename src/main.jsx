@@ -7,7 +7,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './contexts/AuthContext'
 import { DatabaseProvider } from './contexts/DatabaseContext.jsx';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Analytics } from "@vercel/analytics/next"
+
 
 const queryClient = new QueryClient();
 
@@ -19,8 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <DatabaseProvider>
             <App />
             <Toaster position="top-right" />
-            <Analytics />
-            </DatabaseProvider>
+          </DatabaseProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
