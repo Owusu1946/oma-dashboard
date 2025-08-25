@@ -16,12 +16,14 @@ import DoctorDashboard from './pages/DoctorDashboard';
 import DoctorProtectedRoute from './components/DoctorProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import DoctorRegistration from './pages/DoctorRegistration';
+import LegalPage from './pages/LegalPage';
 
 function App() {
   return (
     <Routes>
       {/* Landing Page */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/legal/:section" element={<LegalPage />} />
 
       {/* Admin Login */}
       <Route path="/admin/login" element={<Login />} />

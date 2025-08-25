@@ -296,7 +296,7 @@ export default function LandingPage() {
           <p className="text-lg text-slate-600 mb-12 max-w-2xl mx-auto">Don't just take our word for it. Here's what doctors in our network have to say about their experience with OMA Health.</p>
           
           <div className="max-w-3xl mx-auto">
-              <div className="relative h-40 flex items-center justify-center">
+              <div className="relative min-h-[12rem] md:min-h-[10rem] flex items-center justify-center">
                   <AnimatePresence mode="wait">
                       <motion.div
                           key={activeTestimonial}
@@ -306,7 +306,7 @@ export default function LandingPage() {
                           transition={{ duration: 0.3 }}
                           className="absolute inset-0"
                       >
-                          <p className="text-2xl italic text-slate-700 leading-relaxed">"{testimonials[activeTestimonial].quote}"</p>
+                          <p className="text-xl md:text-2xl italic text-slate-700 leading-relaxed">"{testimonials[activeTestimonial].quote}"</p>
                       </motion.div>
                   </AnimatePresence>
               </div>
@@ -318,11 +318,11 @@ export default function LandingPage() {
                   transition={{ duration: 0.5, delay: 0.1 }}
                   className="mt-8"
               >
-                  <p className="text-xl font-bold text-slate-900">{testimonials[activeTestimonial].name}</p>
-                  <p className="text-slate-500">{testimonials[activeTestimonial].location}</p>
+                  <p className="text-lg md:text-xl font-bold text-slate-900">{testimonials[activeTestimonial].name}</p>
+                  <p className="text-sm md:text-base text-slate-500">{testimonials[activeTestimonial].location}</p>
               </motion.div>
               
-              <div className="flex justify-center items-center space-x-4 mt-12">
+              <div className="flex justify-center items-center space-x-2 md:space-x-4 mt-12">
                   {testimonials.map((testimonial, index) => (
                       <motion.button
                           key={index}
@@ -334,7 +334,7 @@ export default function LandingPage() {
                           <img 
                               src={testimonial.avatar} 
                               alt={testimonial.name} 
-                              className={`w-16 h-16 rounded-full object-cover transition-all duration-300 border-4 border-transparent ${activeTestimonial === index ? 'border-blue-500' : 'opacity-50 grayscale hover:opacity-100 hover:grayscale-0'}`}
+                              className={`w-12 h-12 md:w-16 md:h-16 rounded-full object-cover transition-all duration-300 border-4 border-transparent ${activeTestimonial === index ? 'border-blue-500' : 'opacity-50 grayscale hover:opacity-100 hover:grayscale-0'}`}
                           />
                       </motion.button>
                   ))}
@@ -393,9 +393,11 @@ export default function LandingPage() {
                     <div className="text-sm text-slate-400 text-center md:text-left">
                         <p>&copy; {new Date().getFullYear()} Optimedix. All rights reserved.</p>
                         <div className="mt-2 md:mt-0">
-                            <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
+                            <Link to="/legal/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
                             <span className="mx-2">|</span>
-                            <Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Use</Link>
+                            <Link to="/legal/terms-of-service" className="hover:text-white transition-colors">Terms of Use</Link>
+                            <span className="mx-2">|</span>
+                            <Link to="/legal/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link>
                         </div>
                     </div>
                     <div className="flex space-x-4 mt-6 md:mt-0">
