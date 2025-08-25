@@ -6,7 +6,9 @@ import {
   KeyIcon, 
   ArrowRightIcon,
   UserIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { mockDoctorAPI } from '../utils/mockDoctorAPI';
@@ -18,11 +20,12 @@ const API_BASE = (DB_API_URL || 'https://oma-db-service-pcxd.onrender.com').repl
 
 export default function DoctorLogin() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1: phone input, 2: OTP input
+  const [step, setStep] = useState('phone'); // 'phone', 'setPassword', 'enterPassword'
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
 
   const toDbPhone = (value) => {
     let cleaned = String(value).replace(/\D/g, '');
@@ -39,63 +42,63 @@ export default function DoctorLogin() {
 
     setLoading(true);
     try {
-      if (USE_MOCK) {
-        await mockDoctorAPI.requestOTP(phoneNumber.trim());
-        toast.success('OTP sent to your phone number (Mock Mode)');
-      } else {
         const payload = { phone_number: toDbPhone(phoneNumber) };
-        console.log('[DoctorLogin][request-otp] API:', `${API_BASE}/auth/doctor/request-otp`, 'payload:', payload);
-        const response = await fetch(`${API_BASE}/auth/doctor/request-otp`, {
+      console.log('[DoctorLogin][check-phone] API:', `${API_BASE}/auth/doctor/check-phone`, 'payload:', payload);
+      const response = await fetch(`${API_BASE}/auth/doctor/check-phone`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
 
-        const isJson = response.headers.get('content-type')?.includes('application/json');
-        const raw = isJson ? await response.json() : await response.text();
-        const result = isJson ? raw : { raw };
-        console.log('[DoctorLogin][request-otp] status:', response.status, 'result:', result);
+      const result = await response.json();
+      console.log('[DoctorLogin][check-phone] status:', response.status, 'result:', result);
 
         if (!response.ok) {
-          throw new Error((isJson ? (result.error || result.message) : result.raw) || 'Failed to send OTP');
+        throw new Error(result.error || 'Failed to verify phone number');
         }
 
-        toast.success('OTP sent to your phone number');
+      if (result.status === 'NEEDS_PASSWORD_SETUP') {
+        setStep('setPassword');
+      } else if (result.status === 'READY_FOR_LOGIN') {
+        setStep('enterPassword');
       }
-      
-      setStep(2);
-      startCountdown();
     } catch (error) {
-      console.error('Error sending OTP:', error);
-      toast.error(error.message || 'Failed to send OTP');
+      console.error('Error checking phone:', error);
+      toast.error(error.message || 'Failed to verify phone number');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOtpSubmit = async (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!otp || otp.length !== 6) {
-      toast.error('Please enter the complete 6-digit OTP');
+    
+    if (step === 'setPassword') {
+      if (password.length < 8) {
+        toast.error('Password must be at least 8 characters long.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        toast.error('Passwords do not match.');
+        return;
+      }
+    }
+
+    if (!password) {
+      toast.error('Please enter your password.');
       return;
     }
 
     setLoading(true);
     try {
-      if (USE_MOCK) {
-        const result = await mockDoctorAPI.verifyOTP(phoneNumber.trim(), otp);
-        localStorage.setItem('doctorToken', result.token);
-        localStorage.setItem('doctorPhone', phoneNumber.trim());
-        toast.success('Login successful! (Mock Mode)');
-      } else {
+      const endpoint = step === 'setPassword' ? 'setup-password' : 'login';
         const payload = { 
           phone_number: toDbPhone(phoneNumber),
-          code: otp
+        password,
         };
-        console.log('[DoctorLogin][verify-otp] API:', `${API_BASE}/auth/doctor/verify-otp`, 'payload:', payload);
-        const response = await fetch(`${API_BASE}/auth/doctor/verify-otp`, {
+      
+      console.log(`[DoctorLogin][${endpoint}] API:`, `${API_BASE}/auth/doctor/${endpoint}`, 'payload:', payload);
+      const response = await fetch(`${API_BASE}/auth/doctor/${endpoint}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -103,24 +106,23 @@ export default function DoctorLogin() {
           body: JSON.stringify(payload),
         });
 
-        const isJson = response.headers.get('content-type')?.includes('application/json');
-        const raw = isJson ? await response.json() : await response.text();
-        const result = isJson ? raw : { raw };
-        console.log('[DoctorLogin][verify-otp] status:', response.status, 'result:', result);
+      const result = await response.json();
+      console.log(`[DoctorLogin][${endpoint}] status:`, response.status, 'result:', result);
 
         if (!response.ok) {
-          throw new Error((isJson ? (result.error || result.message) : result.raw) || 'Invalid OTP');
+        throw new Error(result.error || 'Login failed');
         }
 
         localStorage.setItem('doctorToken', result.token);
         localStorage.setItem('doctorPhone', phoneNumber.trim());
+      // You may want to store more doctor info from result.doctor
+      localStorage.setItem('doctorInfo', JSON.stringify(result.doctor));
         toast.success('Login successful!');
-      }
       
       navigate('/doctor/dashboard', { replace: true });
     } catch (error) {
-      console.error('Error verifying OTP:', error);
-      toast.error(error.message || 'Invalid OTP');
+      console.error('Error during login/setup:', error);
+      toast.error(error.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -144,6 +146,7 @@ export default function DoctorLogin() {
     handlePhoneSubmit(new Event('submit'));
   };
 
+
   const formatPhoneNumber = (value) => {
     const cleaned = value.replace(/\D/g, '');
     
@@ -162,6 +165,19 @@ export default function DoctorLogin() {
     const formatted = formatPhoneNumber(e.target.value);
     setPhoneNumber(formatted);
   };
+
+  const getTitle = () => {
+    if (step === 'phone') return 'Sign In to Your Account';
+    if (step === 'setPassword') return 'Create Your Secure Password';
+    return 'Enter Your Password';
+  };
+
+  const getDescription = () => {
+    if (step === 'phone') return 'Enter your phone number to begin.';
+    if (step === 'setPassword') return 'This is a one-time setup to secure your account.';
+    return `Welcome back! Please enter the password for ${phoneNumber}`;
+  };
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -236,25 +252,22 @@ export default function DoctorLogin() {
           >
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                {step === 1 ? (
+                {step === 'phone' ? (
                   <PhoneIcon className="w-8 h-8 text-slate-600" />
                 ) : (
                   <KeyIcon className="w-8 h-8 text-slate-600" />
                 )}
               </div>
               <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                {step === 1 ? 'Sign In to Your Account' : 'Verify Your Identity'}
+                {getTitle()}
               </h2>
               <p className="text-slate-500">
-                {step === 1 
-                  ? 'Enter your phone number to receive a secure login code'
-                  : 'Enter the 6-digit code sent to your phone'
-                }
+                {getDescription()}
               </p>
             </div>
 
             <AnimatePresence mode="wait">
-              {step === 1 ? (
+              {step === 'phone' ? (
                 <motion.form
                   key="phone-form"
                   initial={{ opacity: 0, x: 20 }}
@@ -282,9 +295,6 @@ export default function DoctorLogin() {
                         disabled={loading}
                       />
                     </div>
-                    <p className="mt-2 text-sm text-slate-500">
-                      We'll send a secure 6-digit code to this number
-                    </p>
                   </div>
 
                   <button
@@ -296,7 +306,7 @@ export default function DoctorLogin() {
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                     ) : (
                       <>
-                        Send Verification Code
+                        Continue
                         <ArrowRightIcon className="ml-2 h-5 w-5" />
                       </>
                     )}
@@ -304,59 +314,59 @@ export default function DoctorLogin() {
                 </motion.form>
               ) : (
                 <motion.form
-                  key="otp-form"
+                  key="password-form"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
-                  onSubmit={handleOtpSubmit}
+                  onSubmit={handlePasswordSubmit}
                   className="space-y-6"
                 >
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-4">
-                      Verification Code
-                    </label>
-                    <div className="flex justify-center">
-                      <OtpInput
-                        value={otp}
-                        onChange={setOtp}
-                        numInputs={6}
-                        isInputNum
-                        shouldAutoFocus
-                        inputStyle={{
-                          width: '3rem',
-                          height: '3rem',
-                          margin: '0 0.25rem',
-                          fontSize: '1.25rem',
-                          fontWeight: '600',
-                          textAlign: 'center',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '0.75rem',
-                          backgroundColor: '#ffffff',
-                          color: '#1e293b',
-                          transition: 'all 0.2s ease',
-                        }}
-                        focusStyle={{
-                          border: '2px solid #0f172a',
-                          boxShadow: '0 0 0 3px rgba(15, 23, 42, 0.1)',
-                        }}
-                        containerStyle={{
-                          gap: '0.5rem',
-                        }}
-                        disabledStyle={{
-                          backgroundColor: '#f8fafc',
-                          color: '#94a3b8',
-                        }}
+                    <label htmlFor="password_field" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                    <div className="relative">
+                      <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                      <input
+                        id="password_field"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Your secure password"
+                        className="block w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-lg transition-colors"
+                        disabled={loading}
                       />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400 hover:text-slate-600">
+                        {showPassword ? <EyeSlashIcon/> : <EyeIcon/>}
+                      </button>
                     </div>
-                    <p className="mt-3 text-sm text-slate-500 text-center">
-                      Enter the 6-digit code sent to {phoneNumber}
-                    </p>
+                    {step === 'setPassword' && <p className="mt-2 text-sm text-slate-500">Must be at least 8 characters long.</p>}
                   </div>
+
+                  {step === 'setPassword' && (
+                    <div>
+                      <label htmlFor="confirm_password_field" className="block text-sm font-medium text-slate-700 mb-2">Confirm Password</label>
+                      <div className="relative">
+                        <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <input
+                          id="confirm_password_field"
+                          name="confirmPassword"
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm your password"
+                          className="block w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 text-lg transition-colors"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="submit"
-                    disabled={loading || otp.length !== 6}
+                    disabled={loading || !password}
                     className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     {loading ? (
@@ -366,29 +376,13 @@ export default function DoctorLogin() {
                     )}
                   </button>
 
-                  {/* Resend OTP */}
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      onClick={resendOtp}
-                      disabled={countdown > 0}
-                      className="text-sm text-slate-600 hover:text-slate-900 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {countdown > 0 
-                        ? `Resend code in ${countdown}s`
-                        : 'Resend verification code'
-                      }
-                    </button>
-                  </div>
-
-                  {/* Back to phone input */}
                   <div className="text-center">
                     <button
                       type="button"
                       onClick={() => {
-                        setStep(1);
-                        setOtp('');
-                        setCountdown(0);
+                        setStep('phone');
+                        setPassword('');
+                        setConfirmPassword('');
                       }}
                       className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
                     >

@@ -33,7 +33,7 @@ import {
   BanknotesIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { mockDoctorAPI } from '../utils/mockDoctorAPI';
+// import { mockDoctorAPI } from '../utils/mockDoctorAPI';
 const DB_API_URL = import.meta.env.VITE_DB_API_URL || import.meta.env.VITE_API_URL;
 const API_BASE = (DB_API_URL || 'https://oma-db-service-pcxd.onrender.com').replace(/\/+$/,'');
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_DOCTOR_API === 'true';
