@@ -95,6 +95,7 @@ export default function LandingPage() {
                     <Link to="/" className="flex items-center space-x-3">
                         <img src="/optimedix-logo.png" alt="Optimedix Logo" className="w-10 h-10" />
                         <h1 className="text-xl font-bold text-slate-900 hidden sm:block">OMA</h1>
+                        <h1 className="text-xl font-bold text-slate-900 sm:hidden">OMA Doctor's Portal</h1>
                     </Link>
                     <nav className="hidden md:flex items-center space-x-8">
                         <a href="#about" className="text-slate-600 hover:text-slate-900 transition-colors">Why Join Us</a>
