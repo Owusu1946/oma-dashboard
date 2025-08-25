@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
     UserGroupIcon, 
     ChatBubbleLeftRightIcon, 
@@ -38,6 +38,29 @@ export default function LandingPage() {
         };
         updateMetaDescription("Join OMA Health to connect with patients, manage your practice seamlessly, and supplement your income. Your expertise, our platform.");
     }, []);
+
+    const testimonials = [
+        {
+            quote: "From the moment I walked into his office, I felt a sense of reassurance. His ability to thoroughly explain my condition and treatment options was exceptional.",
+            name: "Mark Williams",
+            location: "New York, USA",
+            avatar: "https://randomuser.me/api/portraits/men/42.jpg",
+        },
+        {
+            quote: "Thanks to Dr. John Smith, I am now living a happier and healthier life. I cannot recommend him enough.",
+            name: "Anderson Piter",
+            location: "Carlton, UK",
+            avatar: "https://randomuser.me/api/portraits/women/42.jpg",
+        },
+        {
+            quote: "The platform is incredibly user-friendly and has allowed me to connect with patients from remote areas. It's a game-changer for healthcare in Africa.",
+            name: "Dr. Joel Boakye",
+            location: "Accra, Ghana",
+            avatar: "/Joel.jpg",
+        },
+    ];
+
+    const [activeTestimonial, setActiveTestimonial] = useState(2);
 
     // Animation variants
     const containerVariants = {
@@ -221,7 +244,7 @@ export default function LandingPage() {
                      transition={{ duration: 0.5 }}
                      className="relative"
                 >
-                    <img src="https://img.freepik.com/free-photo/portrait-smiling-confident-male-doctor-with-arms-crossed_171337-5101.jpg?w=996" alt="Dr. Kweku" className="rounded-3xl shadow-xl"/>
+                    <img src="/Joel.jpg" alt="Dr. Joel Boakye" className="rounded-3xl shadow-xl"/>
                     <motion.div 
                         initial={{ opacity: 0, scale: 0.8 }}
                         whileInView={{ opacity: 1, scale: 1 }}
@@ -242,7 +265,7 @@ export default function LandingPage() {
                     <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">Work On Your Terms. <br /> Make a Difference.</h2>
                     <div className="border-l-4 border-blue-500 pl-6 mb-8">
                         <p className="text-slate-600 text-lg italic">"As a doctor with a full-time job, OMA Health provides the perfect platform to utilize my skills and earn extra income during my free hours. The flexibility is unmatched."</p>
-                        <p className="text-slate-800 font-semibold mt-4">- Dr. Kweku</p>
+                        <p className="text-slate-800 font-semibold mt-4">- Dr. Joel Boakye</p>
                     </div>
                     <p className="text-slate-600 text-lg mb-8">
                         Join a network of professionals leveraging OMA Health to connect with patients, provide care, and build a supplementary income stream—all while maintaining their primary employment.
@@ -258,36 +281,56 @@ export default function LandingPage() {
         </section>
 
         {/* Testimonials */}
-      <section id="testimonials" className="bg-white py-20">
+      <section id="testimonials" className="bg-slate-50 py-20">
         <div className="container mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Loved by Doctors Everywhere</h2>
           <p className="text-lg text-slate-600 mb-12 max-w-2xl mx-auto">Don't just take our word for it. Here's what doctors in our network have to say about their experience with OMA Health.</p>
-           <motion.div 
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 text-left"
-              variants={containerVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.3 }}
-            >
-                <TestimonialCard 
-                    quote="From the moment I walked into his office, I felt a sense of reassurance. His ability to thoroughly explain my condition and treatment options was exceptional."
-                    name="Mark Williams"
-                    location="New York, USA"
-                    avatar="https://randomuser.me/api/portraits/men/42.jpg"
-                />
-                 <TestimonialCard 
-                    quote="Thanks to Dr. John Smith, I am now living a happier and healthier life. I cannot recommend him enough."
-                    name="Anderson Piter"
-                    location="Carlton, UK"
-                    avatar="https://randomuser.me/api/portraits/women/42.jpg"
-                />
-                <TestimonialCard 
-                    quote="The platform is incredibly user-friendly and has allowed me to connect with patients from remote areas. It's a game-changer for healthcare in Africa."
-                    name="Dr. Adama Diop"
-                    location="Dakar, Senegal"
-                    avatar="https://randomuser.me/api/portraits/women/43.jpg"
-                />
-            </motion.div>
+          
+          <div className="max-w-3xl mx-auto">
+              <div className="relative h-40 flex items-center justify-center">
+                  <AnimatePresence mode="wait">
+                      <motion.div
+                          key={activeTestimonial}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.3 }}
+                          className="absolute inset-0"
+                      >
+                          <p className="text-2xl italic text-slate-700 leading-relaxed">"{testimonials[activeTestimonial].quote}"</p>
+                      </motion.div>
+                  </AnimatePresence>
+              </div>
+
+              <motion.div 
+                  key={activeTestimonial + 'author'}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  className="mt-8"
+              >
+                  <p className="text-xl font-bold text-slate-900">{testimonials[activeTestimonial].name}</p>
+                  <p className="text-slate-500">{testimonials[activeTestimonial].location}</p>
+              </motion.div>
+              
+              <div className="flex justify-center items-center space-x-4 mt-12">
+                  {testimonials.map((testimonial, index) => (
+                      <motion.button
+                          key={index}
+                          onClick={() => setActiveTestimonial(index)}
+                          className="relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
+                      >
+                          <img 
+                              src={testimonial.avatar} 
+                              alt={testimonial.name} 
+                              className={`w-16 h-16 rounded-full object-cover transition-all duration-300 border-4 border-transparent ${activeTestimonial === index ? 'border-blue-500' : 'opacity-50 grayscale hover:opacity-100 hover:grayscale-0'}`}
+                          />
+                      </motion.button>
+                  ))}
+              </div>
+          </div>
         </div>
       </section>
 
