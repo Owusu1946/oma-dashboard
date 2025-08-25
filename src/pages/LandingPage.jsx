@@ -61,6 +61,7 @@ export default function LandingPage() {
     ];
 
     const [activeTestimonial, setActiveTestimonial] = useState(2);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     // Animation variants
     const containerVariants = {
@@ -83,14 +84,14 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-800 font-sans">
         {/* Header */}
-        <div className="fixed top-0 left-0 right-0 z-50 hidden md:flex justify-center">
-            <motion.header 
-                initial={{ y: -100, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 100, delay: 0.2 }}
-                className="mt-4 bg-white/80 backdrop-blur-lg rounded-full shadow-lg border border-slate-200/60"
-            >
-                <div className="px-6 py-3 flex items-center space-x-10">
+        <motion.header 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 100, delay: 0.2 }}
+            className="fixed top-0 left-0 right-0 z-50 flex justify-center"
+        >
+            <div className="mt-4 mx-4 md:mx-0 w-full md:w-auto bg-white/80 backdrop-blur-lg rounded-full shadow-lg border border-slate-200/60">
+                <div className="px-6 py-3 flex items-center justify-between space-x-10">
                     <Link to="/" className="flex items-center space-x-3">
                         <img src="/optimedix-logo.png" alt="Optimedix Logo" className="w-10 h-10" />
                         <h1 className="text-xl font-bold text-slate-900 hidden sm:block">OMA</h1>
@@ -99,7 +100,7 @@ export default function LandingPage() {
                         <a href="#about" className="text-slate-600 hover:text-slate-900 transition-colors">Why Join Us</a>
                         <a href="#testimonials" className="text-slate-600 hover:text-slate-900 transition-colors">Testimonials</a>
                     </nav>
-                    <div className="flex items-center space-x-4">
+                    <div className="hidden md:flex items-center space-x-4">
                         <Link to="/doctor/login" className="text-slate-600 hover:text-slate-900 font-medium transition-colors">
                             Log In
                         </Link>
@@ -107,40 +108,47 @@ export default function LandingPage() {
                             Register
                         </Link>
                     </div>
+                    <div className="md:hidden">
+                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="z-50 relative w-8 h-8 text-slate-900">
+                            <span className={`block absolute h-0.5 w-full bg-current transform transition duration-500 ease-in-out ${isMenuOpen ? 'rotate-45' : '-translate-y-1.5'}`}></span>
+                            <span className={`block absolute h-0.5 w-full bg-current transform transition duration-500 ease-in-out ${isMenuOpen ? 'opacity-0' : ''}`}></span>
+                            <span className={`block absolute h-0.5 w-full bg-current transform transition duration-500 ease-in-out ${isMenuOpen ? '-rotate-45' : 'translate-y-1.5'}`}></span>
+                        </button>
+                    </div>
                 </div>
-            </motion.header>
-        </div>
+            </div>
+        </motion.header>
 
-        {/* Mobile Bottom Navbar */}
-        <motion.div 
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 100, delay: 0.5 }}
-            className="md:hidden fixed bottom-4 left-4 right-4 z-50 bg-white/90 backdrop-blur-lg rounded-2xl shadow-lg border border-slate-200/60 overflow-hidden"
-        >
-            <nav className="flex justify-around items-center h-20">
-                <a href="#about" className="flex flex-col items-center justify-center text-slate-600 hover:text-slate-900 transition-colors h-full w-1/4">
-                    <UserGroupIcon className="w-6 h-6 mb-1" />
-                    <span className="text-xs font-medium text-center">Why Join</span>
-                </a>
-                <a href="#testimonials" className="flex flex-col items-center justify-center text-slate-600 hover:text-slate-900 transition-colors h-full w-1/4">
-                    <ChatBubbleLeftRightIcon className="w-6 h-6 mb-1" />
-                    <span className="text-xs font-medium text-center">Stories</span>
-                </a>
-                <Link to="/doctor/login" className="flex flex-col items-center justify-center text-slate-600 hover:text-slate-900 transition-colors h-full w-1/4">
-                    <ArrowRightOnRectangleIcon className="w-6 h-6 mb-1" />
-                    <span className="text-xs font-medium text-center">Log In</span>
-                </Link>
-                <Link to="/doctor/register" className="flex flex-col items-center justify-center h-full w-1/4 bg-slate-900 text-white hover:bg-slate-800 transition-colors">
-                    <UserPlusIcon className="w-6 h-6 mb-1" />
-                    <span className="text-xs font-bold text-center">Register</span>
-                </Link>
-            </nav>
-        </motion.div>
+        <AnimatePresence>
+            {isMenuOpen && (
+                <motion.div
+                    initial={{ opacity: 0, y: "-100%" }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: "-100%" }}
+                    transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                    className="fixed inset-0 z-40 bg-white/95 backdrop-blur-lg"
+                >
+                    <div className="h-full flex flex-col items-center justify-center pt-20">
+                        <nav className="flex flex-col items-center space-y-8">
+                            <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-2xl font-semibold text-slate-700 hover:text-slate-900 transition-colors">Why Join Us</a>
+                            <a href="#testimonials" onClick={() => setIsMenuOpen(false)} className="text-2xl font-semibold text-slate-700 hover:text-slate-900 transition-colors">Testimonials</a>
+                        </nav>
+                        <div className="mt-12 flex flex-col items-center space-y-6 w-full px-8">
+                             <Link to="/doctor/login" onClick={() => setIsMenuOpen(false)} className="w-full text-center border border-slate-300 text-slate-700 px-8 py-3 rounded-full font-medium hover:bg-slate-100 transition-colors">
+                                Log In
+                            </Link>
+                            <Link to="/doctor/register" onClick={() => setIsMenuOpen(false)} className="w-full text-center bg-slate-900 text-white px-8 py-3 rounded-full font-medium hover:bg-slate-800 transition-colors">
+                                Register
+                            </Link>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
 
         {/* Hero Section */}
-        <main className="relative pt-12 md:pt-24 pb-24 md:pb-0">
-            <div className="container mx-auto px-2 py-4 md:py-6 grid md:grid-cols-2 gap-12 items-center">
+        <main className="relative pt-24 md:pt-32 pb-24">
+            <div className="container mx-auto px-4 py-4 md:py-6 grid md:grid-cols-2 gap-12 items-center">
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
