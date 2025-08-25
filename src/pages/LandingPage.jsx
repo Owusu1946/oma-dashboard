@@ -143,8 +143,8 @@ export default function LandingPage() {
                     transition={{ duration: 0.5, delay: 0.3 }}
                 >
                     <img 
-                        src="https://img.freepik.com/free-photo/handsome-smiling-medical-professional-examining-with-stethoscope-hospital-generated-by-ai_188544-126417.jpg?t=st=1724673891~exp=1724677491~hmac=9da3c33324c43ba09017f7b7f6c27380c2f3061559891820a45d0ed97c8d76a7&w=1380" 
-                        alt="Doctor providing telemedicine"
+                        src="/dash1.png"
+                        alt="OMA Health Doctor Dashboard"
                         className="rounded-3xl shadow-2xl"
                     />
                     <motion.div 

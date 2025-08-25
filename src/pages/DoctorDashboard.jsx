@@ -183,7 +183,7 @@ export default function DoctorDashboard() {
 
   // React Query for Bookings (will be used in BookingsView)
   // This initial fetch helps populate the stats on the main dashboard
-  const { data: initialBookingsData } = useQuery({
+  const { data: initialBookingsData, isLoading: areInitialBookingsLoading } = useQuery({
     queryKey: ['bookings', { page: 1, limit: 5, sortField: 'consultation_date', sortOrder: 'desc' }],
     queryFn: fetchDoctorBookings,
   });
@@ -735,28 +735,52 @@ export default function DoctorDashboard() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="bg-white rounded-2xl border border-slate-200/60 p-6"
         >
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h3>
-          <div className="space-y-4">
-            {/* This section will be updated to use React Query for bookings */}
-            {/* For now, it will show a placeholder or the last few from mock */}
-            {/* In a real app, you'd fetch recent bookings from the API */}
-            {/* Example: const { data: recentBookings } = useQuery({ queryKey: ['recentBookings'] }); */}
-            {/* {recentBookings?.slice(0, 3).map((booking, index) => ( */}
-            {/*   <div key={booking.id} className="flex items-center justify-between py-2"> */}
-            {/*     <div> */}
-            {/*       <p className="font-medium text-slate-900">{booking.users?.first_name || 'Patient'}</p> */}
-            {/*       <p className="text-sm text-slate-500">{formatDate(booking.consultation_date)}</p> */}
-            {/*     </div> */}
-            {/*     <span className={`px-2 py-1 text-xs font-medium rounded-full ${ */}
-            {/*       booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : */}
-            {/*       booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' : */}
-            {/*       'bg-amber-100 text-amber-700' */}
-            {/*     }`}> */}
-            {/*       {booking.status} */}
-            {/*     </span> */}
-            {/*   </div> */}
-            {/* ))} */}
-            <p className="text-slate-500 text-center">Recent activity data will be updated with React Query.</p>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">Recent Activity</h3>
+            <button
+                onClick={() => setActiveView('bookings')}
+                className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            >
+                View all
+            </button>
+          </div>
+          <div>
+            {areInitialBookingsLoading ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between animate-pulse">
+                    <div>
+                      <div className="h-4 bg-slate-200 rounded w-24 mb-2"></div>
+                      <div className="h-3 bg-slate-200 rounded w-32"></div>
+                    </div>
+                    <div className="h-5 bg-slate-200 rounded-full w-20"></div>
+                  </div>
+                ))}
+              </div>
+            ) : initialBookingsData?.bookings?.length > 0 ? (
+              <ul role="list" className="divide-y divide-slate-100">
+                {initialBookingsData.bookings.slice(0, 3).map((booking) => (
+                  <li key={booking.id} className="py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-slate-900">{booking.users?.first_name || 'Patient'}</p>
+                        <p className="text-sm text-slate-500">{formatDate(booking.consultation_date)}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                        booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                        booking.status === 'cancelled' ? 'bg-slate-100 text-slate-600' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {booking.status}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-slate-500 text-center py-4">No recent activity.</p>
+            )}
           </div>
         </motion.div>
       </div>
