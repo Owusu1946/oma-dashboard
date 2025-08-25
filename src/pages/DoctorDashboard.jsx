@@ -122,6 +122,20 @@ export default function DoctorDashboard() {
   const queryClient = useQueryClient();
   const notificationsButtonRef = useRef(null);
 
+  useEffect(() => {
+    document.title = "Doctor Dashboard | OMA Health";
+    const updateMetaDescription = (content) => {
+        let meta = document.querySelector('meta[name="description"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = "description";
+            document.head.appendChild(meta);
+        }
+        meta.content = content;
+    };
+    updateMetaDescription("Manage your patient consultations, prescriptions, and telemedicine sessions on the OMA Health dashboard.");
+  }, []);
+
   // State
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeView, setActiveView] = useState('dashboard');

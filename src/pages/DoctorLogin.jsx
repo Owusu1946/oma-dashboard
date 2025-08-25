@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -26,6 +26,20 @@ export default function DoctorLogin() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    document.title = "Doctor Login | OMA Health";
+    const updateMetaDescription = (content) => {
+        let meta = document.querySelector('meta[name="description"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = "description";
+            document.head.appendChild(meta);
+        }
+        meta.content = content;
+    };
+    updateMetaDescription("Doctor login for OMA Health telemedicine platform. Access your dashboard to manage patient consultations.");
+  }, []);
 
   const toDbPhone = (value) => {
     let cleaned = String(value).replace(/\D/g, '');

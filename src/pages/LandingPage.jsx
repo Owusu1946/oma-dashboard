@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -25,6 +25,20 @@ const OMAIcon = () => (
   );
 
 export default function LandingPage() {
+    useEffect(() => {
+        document.title = "OMA: Empowering African Doctors";
+        const updateMetaDescription = (content) => {
+            let meta = document.querySelector('meta[name="description"]');
+            if (!meta) {
+                meta = document.createElement('meta');
+                meta.name = "description";
+                document.head.appendChild(meta);
+            }
+            meta.content = content;
+        };
+        updateMetaDescription("Join OMA Health to connect with patients, manage your practice seamlessly, and supplement your income. Your expertise, our platform.");
+    }, []);
+
     // Animation variants
     const containerVariants = {
         hidden: { opacity: 0 },
