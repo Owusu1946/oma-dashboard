@@ -12,6 +12,7 @@ import {
     EnvelopeIcon
 } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
+import CookieConsent from '../components/CookieConsent';
 
 
 const OMAIcon = () => (
@@ -37,7 +38,21 @@ export default function LandingPage() {
             meta.content = content;
         };
         updateMetaDescription("Join OMA Health to connect with patients, manage your practice seamlessly, and supplement your income. Your expertise, our platform.");
+        
+        const consent = localStorage.getItem('cookie_consent');
+        if (!consent) {
+            // Use a timeout to avoid layout shift and make it less intrusive
+            const timer = setTimeout(() => {
+                setShowCookiePopup(true);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
     }, []);
+
+    const handleAcceptCookies = () => {
+        localStorage.setItem('cookie_consent', 'true');
+        setShowCookiePopup(false);
+    };
 
     const testimonials = [
         {
@@ -62,6 +77,7 @@ export default function LandingPage() {
 
     const [activeTestimonial, setActiveTestimonial] = useState(2);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [showCookiePopup, setShowCookiePopup] = useState(false);
 
     // Animation variants
     const containerVariants = {
@@ -421,6 +437,7 @@ export default function LandingPage() {
                 </div>
             </div>
         </footer>
+        {showCookiePopup && <CookieConsent onAccept={handleAcceptCookies} />}
     </div>
   );
 }
