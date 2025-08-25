@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowPathIcon, HeartIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
@@ -8,32 +8,32 @@ import ActivityFeed from '../components/ActivityFeed';
 import AnalyticsChart from '../components/AnalyticsChart';
 
 export default function Dashboard() {
-  const { stats, activities, loading, error, fetchDashboardData } = useDatabase();
+  const { stats, activities, loading, error, fetchDashboardData, fetchAnalyticsData } = useDatabase();
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [chartData, setChartData] = useState(null);
   const [timeframe, setTimeframe] = useState('week');
   
-  // Load analytics data
-  useEffect(() => {
-    fetchAnalyticsData(timeframe);
-  }, [timeframe]);
-  
-  // Fetch analytics data based on the selected timeframe
-  const fetchAnalyticsData = async (period) => {
+  const loadAnalyticsData = useCallback(async (period) => {
+    if (!fetchAnalyticsData) return;
     try {
       setAnalyticsLoading(true);
-      const data = await useDatabase().fetchAnalyticsData(period);
+      const data = await fetchAnalyticsData(period);
       setChartData(data);
-    } catch (error) {
-      console.error('Error fetching analytics data:', error);
+    } catch (err) {
+      console.error('Error fetching analytics data:', err);
     } finally {
       setAnalyticsLoading(false);
     }
-  };
-
+  }, [fetchAnalyticsData]);
+  
+  // Load analytics data on timeframe change
+  useEffect(() => {
+    loadAnalyticsData(timeframe);
+  }, [timeframe, loadAnalyticsData]);
+  
   const refreshData = () => {
     fetchDashboardData();
-    fetchAnalyticsData(timeframe);
+    loadAnalyticsData(timeframe);
   };
 
   if (error) {

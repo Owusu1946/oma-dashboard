@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
@@ -9,6 +9,7 @@ import KYCDashboard from './pages/KYCDashboard';
 import ChatViewer from './pages/ChatViewer';
 import EscalationList from './pages/EscalationList';
 import ProtectedRoute from './components/ProtectedRoute';
+import Layout from './components/Layout';
 
 import DoctorLogin from './pages/DoctorLogin';
 import DoctorDashboard from './pages/DoctorDashboard';
@@ -22,16 +23,28 @@ function App() {
       {/* Landing Page */}
       <Route path="/" element={<LandingPage />} />
 
-      {/* Admin Routes */}
+      {/* Admin Login */}
       <Route path="/admin/login" element={<Login />} />
-      <Route path="/admin/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/admin/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-      <Route path="/admin/users/:userId" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-      <Route path="/admin/doctors" element={<ProtectedRoute><Doctors /></ProtectedRoute>} />
-      <Route path="/admin/pharmacies" element={<ProtectedRoute><Pharmacies /></ProtectedRoute>} />
-      <Route path="/admin/kyc" element={<ProtectedRoute><KYCDashboard /></ProtectedRoute>} />
-      <Route path="/admin/chat" element={<ProtectedRoute><ChatViewer /></ProtectedRoute>} />
-      <Route path="/admin/escalations" element={<ProtectedRoute><EscalationList /></ProtectedRoute>} />
+      
+      {/* Admin Routes */}
+      <Route 
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="users" element={<Users />} />
+        <Route path="users/:userId" element={<UserProfile />} />
+        <Route path="doctors" element={<Doctors />} />
+        <Route path="pharmacies" element={<Pharmacies />} />
+        <Route path="kyc" element={<KYCDashboard />} />
+        <Route path="chat" element={<ChatViewer />} />
+        <Route path="escalations" element={<EscalationList />} />
+      </Route>
       
       {/* Doctor Routes */}
       <Route path="/doctor/login" element={<DoctorLogin />} />
