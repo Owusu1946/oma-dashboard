@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import CookieConsent from '../components/CookieConsent';
+import Marquee from "react-fast-marquee";
 
 
 const OMAIcon = () => (
@@ -68,16 +69,10 @@ export default function LandingPage() {
 
     const testimonials = [
         {
-            quote: "From the moment I walked into his office, I felt a sense of reassurance. His ability to thoroughly explain my condition and treatment options was exceptional.",
-            name: "Mark Williams",
-            location: "New York, USA",
-            avatar: "https://randomuser.me/api/portraits/men/42.jpg",
-        },
-        {
-            quote: "Thanks to Dr. John Smith, I am now living a happier and healthier life. I cannot recommend him enough.",
-            name: "Anderson Piter",
-            location: "Carlton, UK",
-            avatar: "https://randomuser.me/api/portraits/women/42.jpg",
+            quote: "OMA Health is a revolutionary platform that empowers medical professionals like myself to extend our reach and impact. It's an honor to be part of this transformation in Ghanaian healthcare.",
+            name: "Dr. Emmanuel Osei Addo",
+            location: "Accra, Ghana",
+            avatar: "/emma.jpg",
         },
         {
             quote: "The platform is incredibly user-friendly and has allowed me to connect with patients from remote areas. It's a game-changer for healthcare in Africa.",
@@ -87,7 +82,7 @@ export default function LandingPage() {
         },
     ];
 
-    const [activeTestimonial, setActiveTestimonial] = useState(2);
+    const [activeTestimonial, setActiveTestimonial] = useState(0);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [showCookiePopup, setShowCookiePopup] = useState(false);
 
@@ -273,47 +268,122 @@ export default function LandingPage() {
 
         {/* About Section */}
         <section id="about" className="py-20 bg-slate-50">
-            <div className="container mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
-                <motion.div
-                     initial={{ opacity: 0, x: -50 }}
-                     whileInView={{ opacity: 1, x: 0 }}
-                     viewport={{ once: true, amount: 0.5 }}
-                     transition={{ duration: 0.5 }}
-                     className="relative"
+            <div className="container mx-auto px-6">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.5 }}
+                    transition={{ duration: 0.5 }}
+                    className="text-center mb-16"
                 >
-                    <img src="/Joel.jpg" alt="Dr. Joel Boakye" className="rounded-3xl shadow-xl"/>
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
+                    <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Work On Your Terms. Make a Difference.</h2>
+                    <p className="text-lg text-slate-600 max-w-3xl mx-auto">Join a network of professionals leveraging OMA Health to connect with patients, provide care, and build a supplementary income stream—all while maintaining their primary employment.</p>
+                </motion.div>
+
+                {/* Dr. Joel Boakye */}
+                <div className="grid md:grid-cols-2 gap-16 items-center">
+                    <motion.div
+                        initial={{ opacity: 0, x: -50 }}
+                        whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true, amount: 0.5 }}
-                        transition={{ duration: 0.5, delay: 0.3 }}
-                        className="absolute -bottom-8 left-8 bg-white p-6 rounded-2xl shadow-lg border border-slate-200/60"
+                        transition={{ duration: 0.5 }}
+                        className="relative"
                     >
-                        <p className="text-2xl font-bold text-slate-900">Flexible Earnings</p>
-                        <p className="text-slate-500">Supplement your income on your schedule.</p>
+                        <img src="/Joel.jpg" alt="Dr. Joel Boakye" className="rounded-3xl shadow-xl"/>
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            whileInView={{ opacity: 1, scale: 1 }}
+                            viewport={{ once: true, amount: 0.5 }}
+                            transition={{ duration: 0.5, delay: 0.3 }}
+                            className="relative mx-auto -mt-12 w-11/12 rounded-2xl bg-white p-6 shadow-lg border border-slate-200/60 md:absolute md:-bottom-8 md:left-8 md:mt-0 md:w-auto"
+                        >
+                            <p className="text-2xl font-bold text-slate-900">Flexible Earnings</p>
+                            <p className="text-slate-500">Supplement your income on your schedule.</p>
+                        </motion.div>
                     </motion.div>
-                </motion.div>
-                 <motion.div
-                     initial={{ opacity: 0, x: 50 }}
-                     whileInView={{ opacity: 1, x: 0 }}
-                     viewport={{ once: true, amount: 0.5 }}
-                     transition={{ duration: 0.5, delay: 0.2 }}
-                 >
-                    <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">Work On Your Terms. <br /> Make a Difference.</h2>
-                    <div className="border-l-4 border-blue-500 pl-6 mb-8">
-                        <p className="text-slate-600 text-lg italic">"As a doctor with a full-time job, OMA Health provides the perfect platform to utilize my skills and earn extra income during my free hours. The flexibility is unmatched."</p>
-                        <p className="text-slate-800 font-semibold mt-4">- Dr. Joel Boakye</p>
-                    </div>
-                    <p className="text-slate-600 text-lg mb-8">
-                        Join a network of professionals leveraging OMA Health to connect with patients, provide care, and build a supplementary income stream—all while maintaining their primary employment.
+                    <motion.div
+                        initial={{ opacity: 0, x: 50 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, amount: 0.5 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                    >
+                        <div className="border-l-4 border-blue-500 pl-6 mb-8">
+                            <p className="text-slate-600 text-lg italic">"As a doctor with a full-time job, OMA Health provides the perfect platform to utilize my skills and earn extra income during my free hours. The flexibility is unmatched."</p>
+                            <p className="text-slate-800 font-semibold mt-4">- Dr. Joel Boakye</p>
+                        </div>
+                        <Link to="/doctor/register">
+                            <button className="bg-slate-900 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-slate-800 transition-all transform hover:scale-105 shadow-lg shadow-slate-900/20 flex items-center space-x-3">
+                                <span>Join Our Network</span>
+                                <ArrowRightIcon className="w-5 h-5" />
+                            </button>
+                        </Link>
+                    </motion.div>
+                </div>
+
+                {/* Dr. Emmanuel Osei Addo */}
+                <div className="grid md:grid-cols-2 gap-16 items-center mt-24">
+                    <motion.div
+                        initial={{ opacity: 0, x: -50 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, amount: 0.5 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                        className="md:order-2"
+                    >
+                        <div className="border-l-4 border-amber-500 pl-6 mb-8">
+                            <h3 className="text-2xl font-bold text-slate-900 mb-4">Dedicated to Patient Care</h3>
+                            <p className="text-slate-600 text-lg">Dr. Emmanuel Osei Addo is a respected medical doctor known for his commitment to patient wellness and his contributions to the Ghanaian healthcare community. His participation on the OMA Health platform brings valuable expertise and a passion for accessible healthcare.</p>
+                        </div>
+                    </motion.div>
+                     <motion.div
+                        initial={{ opacity: 0, x: 50 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true, amount: 0.5 }}
+                        transition={{ duration: 0.5 }}
+                        className="relative md:order-1"
+                    >
+                        <img src="/emma.jpg" alt="Dr. Emmanuel Osei Addo" className="rounded-3xl shadow-xl"/>
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            whileInView={{ opacity: 1, scale: 1 }}
+                            viewport={{ once: true, amount: 0.5 }}
+                            transition={{ duration: 0.5, delay: 0.3 }}
+                            className="relative mx-auto -mt-12 w-11/12 rounded-2xl bg-white p-6 shadow-lg border border-slate-200/60 md:absolute md:-bottom-8 md:left-8 md:mt-0 md:w-auto"
+                        >
+                            <p className="text-2xl font-bold text-slate-900">Patient-Centric Care</p>
+                            <p className="text-slate-500">Compassionate and expert medical advice.</p>
+                        </motion.div>
+                    </motion.div>
+                </div>
+            </div>
+        </section>
+
+        {/* Trust & Security Section */}
+        <section className="bg-slate-50 py-20 sm:py-24">
+            <div className="mx-auto max-w-7xl px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl lg:max-w-none text-center">
+                    <p className="text-base font-semibold leading-7 text-sky-600">Secure. Compliant. Trusted.</p>
+                    <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                        Your Health Data is Safe With Us
+                    </h2>
+                    <p className="mt-6 text-lg leading-8 text-slate-600">
+                        We are committed to the highest standards of data privacy and security. Our platform is built on a foundation of trust, ensuring compliance with global regulations.
                     </p>
-                    <Link to="/doctor/register">
-                        <button className="bg-slate-900 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-slate-800 transition-all transform hover:scale-105 shadow-lg shadow-slate-900/20 flex items-center space-x-3">
-                            <span>Join Our Network</span>
-                            <ArrowRightIcon className="w-5 h-5" />
-                        </button>
-                    </Link>
-                </motion.div>
+                </div>
+                <div className="mt-16 relative">
+                    <div className="absolute inset-0 z-10 bg-gradient-to-r from-slate-50 via-transparent to-slate-50 pointer-events-none"></div>
+                    <Marquee speed={50} pauseOnHover={true}>
+                        <div className="flex items-center space-x-20 px-10">
+                            <img src="/security cert/hipaa.jpg" alt="HIPAA Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                            <img src="/security cert/gdpr.webp" alt="GDPR Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                            <img src="/security cert/hipaa.jpg" alt="HIPAA Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                            <img src="/security cert/gdpr.webp" alt="GDPR Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                            <img src="/security cert/hipaa.jpg" alt="HIPAA Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                            <img src="/security cert/gdpr.webp" alt="GDPR Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                            <img src="/security cert/hipaa.jpg" alt="HIPAA Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                            <img src="/security cert/gdpr.webp" alt="GDPR Compliant" className="h-14 object-contain filter grayscale hover:grayscale-0 transition-all duration-300" />
+                        </div>
+                    </Marquee>
+                </div>
             </div>
         </section>
 
