@@ -262,7 +262,8 @@ export default function DoctorLogin() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="bg-white rounded-2xl border border-slate-200/60 shadow-xl p-8"
+            whileHover={{ y: -5 }}
+            className="bg-white rounded-2xl border border-slate-200/60 shadow-xl p-8 hover:shadow-2xl transition-shadow"
           >
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -311,9 +312,11 @@ export default function DoctorLogin() {
                     </div>
                   </div>
 
-                  <button
+                  <motion.button
                     type="submit"
                     disabled={loading || !phoneNumber.trim()}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     {loading ? (
@@ -324,7 +327,7 @@ export default function DoctorLogin() {
                         <ArrowRightIcon className="ml-2 h-5 w-5" />
                       </>
                     )}
-                  </button>
+                  </motion.button>
                 </motion.form>
               ) : (
                 <motion.form
@@ -378,9 +381,11 @@ export default function DoctorLogin() {
                     </div>
                   )}
 
-                  <button
+                  <motion.button
                     type="submit"
                     disabled={loading || !password}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     {loading ? (
@@ -388,20 +393,21 @@ export default function DoctorLogin() {
                     ) : (
                       'Verify & Sign In'
                     )}
-                  </button>
+                  </motion.button>
 
                   <div className="text-center">
-                    <button
+                    <motion.button
                       type="button"
                       onClick={() => {
                         setStep('phone');
                         setPassword('');
                         setConfirmPassword('');
                       }}
+                      whileHover={{ x: -5 }}
                       className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
                     >
                       ← Use different phone number
-                    </button>
+                    </motion.button>
                   </div>
                 </motion.form>
               )}
@@ -410,20 +416,18 @@ export default function DoctorLogin() {
 
           {/* Footer */}
           <div className="text-center text-sm text-slate-500">
-            <p className="mb-2">Welcome to OMA Health - Your Telemedicine Platform</p>
-            <p className="mb-3">
+            <p className="mb-2">
+              Don't have an account?{' '}
+              <Link to="/doctor/register" className="font-medium text-slate-700 hover:text-slate-900">
+                Register
+              </Link>
+            </p>
+            <p className="mt-3">
               Need help? Contact{' '}
               <a href="mailto:support@omahealth.com" className="text-slate-700 hover:text-slate-900 font-medium">
                 support@omahealth.com
               </a>
             </p>
-            <Link 
-              to="/admin/login" 
-              className="inline-flex items-center text-slate-600 hover:text-slate-900 font-medium transition-colors"
-            >
-              <ShieldCheckIcon className="w-4 h-4 mr-1" />
-              Admin Portal Access
-            </Link>
           </div>
         </div>
       </div>

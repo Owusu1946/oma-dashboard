@@ -160,7 +160,7 @@ export default function Users() {
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Link to={`/users/${user.id}`} className="flex items-center group">
+                        <Link to={`/admin/users/${user.id}`} className="flex items-center group">
                           <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center mr-3 border border-gray-200 overflow-hidden">
                             <UserCircleIcon className="h-8 w-8 text-gray-400" />
                           </div>

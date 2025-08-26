@@ -35,7 +35,7 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { usePDF } from 'react-to-pdf';
+import LoadingSpinner from '../components/LoadingSpinner';
 // import { mockDoctorAPI } from '../utils/mockDoctorAPI';
 const DB_API_URL = import.meta.env.VITE_DB_API_URL || import.meta.env.VITE_API_URL;
 const API_BASE = (DB_API_URL || 'https://oma-db-service-pcxd.onrender.com').replace(/\/+$/,'');
@@ -44,6 +44,16 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_DOCTOR_API === 'true';
 // ==================================
 // API Fetcher Functions
 // ==================================
+
+const fetchDoctorAnalytics = async () => {
+  const token = localStorage.getItem('doctorToken');
+  if (!token) throw new Error('No auth token found');
+  const response = await fetch(`${API_BASE}/doctor/analytics`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch analytics');
+  return response.json();
+};
 
 const fetchDoctorProfile = async () => {
   const token = localStorage.getItem('doctorToken');
@@ -79,37 +89,46 @@ const fetchDoctorPrescriptions = async () => {
 };
 
 const fetchDoctorFinance = async () => {
-  // MOCK API: Replace with real API call
-  console.log('[MOCK_API] Fetching doctor finance data...');
-  return new Promise(resolve => setTimeout(() => resolve({
-    totalEarnings: 1250.00,
-    availableForPayout: 780.50,
-    lastPayout: { date: '2025-08-15T10:00:00.000Z', amount: 400.00 },
-    payoutHistory: [
-      { id: 'p1', date: '2025-08-15T10:00:00.000Z', amount: 400.00, status: 'Completed' },
-      { id: 'p2', date: '2025-07-28T14:30:00.000Z', amount: 350.50, status: 'Completed' },
-      { id: 'p3', date: '2025-07-12T09:00:00.000Z', amount: 500.00, status: 'Completed' },
-    ],
-    paymentMethod: null, // Start with no payment method
-  }), 500));
+  const token = localStorage.getItem('doctorToken');
+  if (!token) throw new Error('No auth token found');
+  const response = await fetch(`${API_BASE}/doctor/finance`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch finance data');
+  return response.json();
 };
 
 const requestPayout = async ({ amount, paymentMethod }) => {
-  // MOCK API: Replace with real API call
-  console.log(`[MOCK_API] Requesting payout for amount: ${amount} to ${paymentMethod.provider} (${paymentMethod.number})`);
-  if (amount <= 0) throw new Error('Invalid amount');
-  // In a real app, this would create a 'pending' transaction in the DB
-  return new Promise(resolve => setTimeout(() => resolve({ 
-    success: true, 
-    newBalance: 780.50 - amount,
-    newPayout: { id: `p${Date.now()}`, date: new Date().toISOString(), amount, status: 'Pending' }
-  }), 1000));
+  const token = localStorage.getItem('doctorToken');
+  if (!token) throw new Error('No auth token found');
+  const response = await fetch(`${API_BASE}/doctor/payouts`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Payout request failed');
+  }
+  return response.json();
 };
 
 const savePaymentMethod = async (paymentMethod) => {
-  // MOCK API: Replace with real API call
-  console.log(`[MOCK_API] Saving payment method:`, paymentMethod);
-  return new Promise(resolve => setTimeout(() => resolve({ success: true, paymentMethod }), 1000));
+  const token = localStorage.getItem('doctorToken');
+  if (!token) throw new Error('No auth token found');
+  const response = await fetch(`${API_BASE}/doctor/payment-method`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: paymentMethod.provider,
+      details: { number: paymentMethod.number },
+    }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to save payment method');
+  }
+  return response.json();
 };
 
 
@@ -143,12 +162,6 @@ export default function DoctorDashboard() {
   const [meetLink, setMeetLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [pdfData, setPdfData] = useState(null);
-  const { toPDF, targetRef } = usePDF({
-    filename: 'e-prescription.pdf',
-    page: { format: 'a4', orientation: 'portrait' },
-    html2canvas: { useCORS: true, scale: 2 }
-  });
 
   // Mock notifications data
   const mockNotifications = [
@@ -207,6 +220,31 @@ export default function DoctorDashboard() {
     queryFn: fetchDoctorPrescriptions,
   });
 
+  const { data: upcomingBookingsData, isLoading: areUpcomingBookingsLoading } = useQuery({
+    queryKey: ['bookings', 'upcoming'],
+    queryFn: async () => {
+      const token = localStorage.getItem('doctorToken');
+      if (!token) throw new Error('No auth token found');
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const params = new URLSearchParams({
+        page: 1,
+        limit: 5,
+        sortField: 'consultation_date',
+        sortOrder: 'asc',
+        status: 'confirmed',
+        from_date: today.toISOString()
+      });
+      const response = await fetch(`${API_BASE}/doctor/bookings?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch upcoming bookings');
+      return response.json();
+    },
+  });
+
   // Mutations for doctor actions
   const mutation = useMutation({
     mutationFn: async ({ url, method = 'PUT', body }) => {
@@ -233,6 +271,28 @@ export default function DoctorDashboard() {
         setMeetLink(data.call_room_url);
         setIsMeetModalOpen(true);
       }
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const waitingNotificationMutation = useMutation({
+    mutationFn: async (bookingId) => {
+      const token = localStorage.getItem('doctorToken');
+      const response = await fetch(`${API_BASE}/doctor/bookings/${bookingId}/waiting`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send notification');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success("Patient has been notified that you're waiting.");
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'upcoming'] });
     },
     onError: (error) => {
       toast.error(error.message);
@@ -355,30 +415,31 @@ export default function DoctorDashboard() {
 
   // Update availability
   const updateAvailability = async (availabilityData) => {
-    try {
-      const token = localStorage.getItem('doctorToken');
-      const resp = await fetch(`${API_BASE}/doctor/availability`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(availabilityData)
-      });
-      if (!resp.ok) throw new Error('Failed to update availability');
-      queryClient.invalidateQueries({ queryKey: ['availability'] });
-      toast.success('Availability updated');
-    } catch (error) {
-      console.error('Update availability error:', error);
-      toast.error('Failed to update availability');
+    const token = localStorage.getItem('doctorToken');
+    const resp = await fetch(`${API_BASE}/doctor/availability`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ availability: availabilityData })
+    });
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({ error: 'Failed to update availability' }));
+      throw new Error(errorData.error || 'Unknown error');
     }
+    return resp.json();
   };
 
   // Render sidebar content
   const renderSidebarContent = () => (
-    <>
+    <div className="flex flex-col h-full">
       {/* Sidebar header */}
-      <div className="flex items-center justify-between p-6 border-b border-slate-200/60">
+      <div className="flex items-center justify-between p-4 border-b border-slate-200/60 h-16">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-            <UserIcon className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center">
+            {doctor?.profile_image_url ? (
+              <img src={doctor.profile_image_url} alt="Doctor" className="w-full h-full rounded-lg object-cover" />
+            ) : (
+              <UserCircleIcon className="w-6 h-6 text-white" />
+            )}
           </div>
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Dr. {doctor?.name || 'Doctor'}</h2>
@@ -394,7 +455,7 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Navigation */}
-      <nav className="p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {sidebarItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
@@ -406,10 +467,10 @@ export default function DoctorDashboard() {
                 setActiveView(item.id);
                 setSidebarOpen(false);
               }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+              className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out transform hover:scale-105 ${
                 isActive
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-slate-900 text-white shadow-lg'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -417,7 +478,9 @@ export default function DoctorDashboard() {
                 <span>{item.name}</span>
               </div>
               {item.badge > 0 && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                  isActive ? 'bg-white text-slate-900' : 'bg-amber-100 text-amber-700'
+                }`}>
                   {item.badge}
                 </span>
               )}
@@ -427,27 +490,20 @@ export default function DoctorDashboard() {
       </nav>
 
       {/* Sidebar footer */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200/60">
+      <div className="p-4 border-t border-slate-200/60">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors"
+          className="w-full flex items-center space-x-3 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors"
         >
           <ArrowRightOnRectangleIcon className="w-5 h-5" />
           <span>Logout</span>
         </button>
       </div>
-    </>
+    </div>
   );
 
   if (isProfileLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (isProfileError || !doctor) {
@@ -626,11 +682,6 @@ export default function DoctorDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* Hidden component for PDF generation */}
-      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-        {pdfData && <PrescriptionPDF prescription={pdfData} doctor={doctor} targetRef={targetRef} />}
-      </div>
     </div>
   );
 
@@ -662,6 +713,44 @@ export default function DoctorDashboard() {
 
   // Dashboard view component
   function DashboardView() {
+    const sendRemindersMutation = useMutation({
+      mutationFn: async () => {
+        const token = localStorage.getItem('doctorToken');
+        const response = await fetch(`${API_BASE}/doctor/bookings/send-reminders`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to send reminders');
+        }
+        return response.json();
+      },
+      onSuccess: (data) => {
+        if (data.remindersSent > 0) {
+          const patientEmailsSent = data.details.filter(d => d.patient.email === 'sent').length;
+          const doctorEmailsSent = data.details.filter(d => d.doctor.email === 'sent').length;
+          const totalEmails = patientEmailsSent + doctorEmailsSent;
+          
+          let message = `${data.remindersSent} booking(s) processed.`;
+          if (totalEmails > 0) {
+              message += ` ${totalEmails} email reminder(s) sent.`;
+          } else {
+              message += ` No emails were sent. Check patient/doctor profiles for email addresses.`;
+          }
+          
+          toast.success(message, { duration: 5000 });
+          queryClient.invalidateQueries({ queryKey: ['bookings', 'upcoming'] });
+        } else {
+          toast.success('No new reminders to send.');
+        }
+        console.log('Reminder results:', data.details); // Also log to console for debugging
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    });
+
     return (
       <div className="space-y-6">
         {/* Status Control */}
@@ -742,59 +831,142 @@ export default function DoctorDashboard() {
           </div>
         </motion.div>
 
-        {/* Recent Activity */}
+        {/* Upcoming Appointments & Recent Activity */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-white rounded-2xl border border-slate-200/60 p-6"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         >
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-slate-900">Recent Activity</h3>
-            <button
-                onClick={() => setActiveView('bookings')}
-                className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-            >
-                View all
-            </button>
-          </div>
-          <div>
-            {areInitialBookingsLoading ? (
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex items-center justify-between animate-pulse">
-                    <div>
-                      <div className="h-4 bg-slate-200 rounded w-24 mb-2"></div>
-                      <div className="h-3 bg-slate-200 rounded w-32"></div>
-                    </div>
-                    <div className="h-5 bg-slate-200 rounded-full w-20"></div>
-                  </div>
-                ))}
-              </div>
-            ) : initialBookingsData?.bookings?.length > 0 ? (
-              <ul role="list" className="divide-y divide-slate-100">
-                {initialBookingsData.bookings.slice(0, 3).map((booking) => (
-                  <li key={booking.id} className="py-3">
-                    <div className="flex items-center justify-between">
+          {/* Upcoming Appointments */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Upcoming Appointments</h3>
+              <button
+                onClick={() => sendRemindersMutation.mutate()}
+                disabled={sendRemindersMutation.isLoading}
+                className="px-3 py-1.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
+              >
+                {sendRemindersMutation.isLoading ? 'Sending...' : 'Send Reminders'}
+              </button>
+            </div>
+            <div>
+              {areUpcomingBookingsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between animate-pulse">
                       <div>
-                        <p className="font-medium text-slate-900">{booking.users?.first_name || 'Patient'}</p>
-                        <p className="text-sm text-slate-500">{formatDate(booking.consultation_date)}</p>
+                        <div className="h-4 bg-slate-200 rounded w-24 mb-2"></div>
+                        <div className="h-3 bg-slate-200 rounded w-32"></div>
                       </div>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                        booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
-                        booking.status === 'cancelled' ? 'bg-slate-100 text-slate-600' :
-                        'bg-amber-100 text-amber-700'
-                      }`}>
-                        {booking.status}
-                      </span>
+                      <div className="h-5 bg-slate-200 rounded-full w-20"></div>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-slate-500 text-center py-4">No recent activity.</p>
-            )}
+                  ))}
+                </div>
+              ) : upcomingBookingsData?.bookings?.length > 0 ? (
+                <ul role="list" className="divide-y divide-slate-100">
+                  {upcomingBookingsData.bookings.map((booking) => {
+                    const consultationTime = new Date(booking.consultation_date);
+                    const now = new Date();
+                    const isJoinable = now >= consultationTime;
+
+                    return (
+                      <li key={booking.id} className="py-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-slate-900">{booking.users?.first_name || 'Patient'}</p>
+                            <p className="text-sm text-slate-500">{formatDate(booking.consultation_date)}</p>
+                            {booking.reminder_sent_at && (
+                              <p className="text-xs text-emerald-600 mt-1 flex items-center">
+                                <BellIcon className="w-3 h-3 mr-1" /> Reminder Sent
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {isJoinable && (
+                              <button
+                                onClick={() => waitingNotificationMutation.mutate(booking.id)}
+                                disabled={waitingNotificationMutation.isLoading || booking.doctor_waiting_notification_sent_at}
+                                className="px-3 py-1.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-200 transition-colors disabled:opacity-50"
+                              >
+                                {booking.doctor_waiting_notification_sent_at ? 'Notified' : "I'm Waiting"}
+                              </button>
+                            )}
+                            <a 
+                              href={isJoinable ? (booking.call_room_url || '#') : '#'} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className={`px-3 py-1.5 text-white text-xs font-medium rounded-lg transition-colors flex items-center space-x-2 ${
+                                isJoinable 
+                                  ? 'bg-slate-900 hover:bg-slate-800' 
+                                  : 'bg-slate-300 cursor-not-allowed'
+                              }`}
+                              onClick={(e) => !isJoinable && e.preventDefault()}
+                            >
+                                <VideoCameraIcon className="w-4 h-4" />
+                                <span>Join</span>
+                            </a>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-slate-500 text-center py-4">No upcoming confirmed appointments.</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Recent Activity */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Recent Activity</h3>
+              <button
+                  onClick={() => setActiveView('bookings')}
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                  View all
+              </button>
+            </div>
+            <div>
+              {areInitialBookingsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between animate-pulse">
+                      <div>
+                        <div className="h-4 bg-slate-200 rounded w-24 mb-2"></div>
+                        <div className="h-3 bg-slate-200 rounded w-32"></div>
+                      </div>
+                      <div className="h-5 bg-slate-200 rounded-full w-20"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : initialBookingsData?.bookings?.length > 0 ? (
+                <ul role="list" className="divide-y divide-slate-100">
+                  {initialBookingsData.bookings.slice(0, 5).map((booking) => (
+                    <li key={booking.id} className="py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-slate-900">{booking.users?.first_name || 'Patient'}</p>
+                          <p className="text-sm text-slate-500">{formatDate(booking.consultation_date)}</p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          booking.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                          booking.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                          booking.status === 'cancelled' ? 'bg-slate-100 text-slate-600' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-slate-500 text-center py-4">No recent activity.</p>
+              )}
+            </div>
           </div>
         </motion.div>
       </div>
@@ -898,17 +1070,6 @@ export default function DoctorDashboard() {
                             >
                               <XCircleIcon className="w-5 h-5" />
                             </button>
-                            <button 
-                              onClick={async () => {
-                                const when = prompt('Enter new date/time (YYYY-MM-DDTHH:mm)');
-                                if (when) await actOnBooking(booking.id, 'reschedule', { consultation_date: when });
-                              }} 
-                              disabled={mutation.isLoading} 
-                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                              title="Reschedule"
-                            >
-                              <ClockIcon className="w-5 h-5" />
-                            </button>
                           </>
                         )}
                         {booking.status === 'confirmed' && (
@@ -978,6 +1139,68 @@ export default function DoctorDashboard() {
       queryFn: fetchDoctorPrescriptions,
     });
 
+    const generatePrescriptionHTML = (prescription, doctor) => {
+      const medicationsHTML = prescription.prescription_items
+        .map(
+          (item) => `
+            <div style="padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8fafc; margin-bottom: 16px;">
+              <p style="font-weight: 600; font-size: 1.125rem; color: #1e293b; margin: 0;">${item.medication_name || item.name}</p>
+              <div style="margin-top: 8px; font-size: 0.875rem;">
+                <p style="margin: 4px 0;"><strong style="font-weight: 500; color: #475569;">Dosage:</strong> ${item.dosage}</p>
+                <p style="margin: 4px 0;"><strong style="font-weight: 500; color: #475569;">Quantity:</strong> ${item.quantity}</p>
+              </div>
+              <p style="margin-top: 8px; font-size: 0.875rem;"><strong style="font-weight: 500; color: #475569;">Instructions:</strong> ${item.instructions}</p>
+            </div>
+          `
+        )
+        .join('');
+    
+      return `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: sans-serif; color: #334155; background-color: #f1f5f9; margin: 0; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0;">
+            <div style="padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+              <h1 style="font-size: 1.875rem; font-weight: 700; color: #0f172a; margin: 0;">OMA Health</h1>
+              <p style="color: #64748b; margin: 4px 0 0;">Your Trusted Telemedicine Partner</p>
+            </div>
+    
+            <table style="width: 100%; margin: 32px 0; border-collapse: collapse;">
+              <tr>
+                <td style="padding-bottom: 16px; vertical-align: top;">
+                  <h2 style="font-size: 1.125rem; font-weight: 600; color: #0f172a; margin: 0;">Dr. ${doctor.name}</h2>
+                  <p style="font-size: 0.875rem; color: #475569; margin: 4px 0 0;">${doctor.specialty}</p>
+                  <p style="font-size: 0.875rem; color: #475569; margin: 4px 0 0;">${doctor.phone_number}</p>
+                </td>
+                <td style="padding-bottom: 16px; text-align: right; vertical-align: top;">
+                  <h2 style="font-size: 1.125rem; font-weight: 600; color: #0f172a; margin: 0;">Patient: ${prescription.patient?.first_name || 'N/A'}</h2>
+                  <p style="font-size: 0.875rem; color: #475569; margin: 4px 0 0;">Date: ${new Date(prescription.created_at).toLocaleDateString()}</p>
+                  <p style="font-size: 0.875rem; color: #475569; margin: 4px 0 0;">Reference ID: ${prescription.reference_id}</p>
+                </td>
+              </tr>
+            </table>
+    
+            <div>
+              <h2 style="font-size: 1.25rem; font-weight: 700; text-align: center; margin-bottom: 24px; padding: 8px 0; background-color: #f1f5f9; border-radius: 8px;">E-Prescription (Rx)</h2>
+              ${medicationsHTML}
+            </div>
+            
+            ${prescription.notes ? `
+            <div style="margin-top: 24px;">
+                <h3 style="font-size: 1rem; font-weight: 600; color: #0f172a;">Doctor's Notes:</h3>
+                <p style="font-size: 0.875rem; color: #475569; border-left: 3px solid #cbd5e1; padding-left: 12px; margin: 8px 0; white-space: pre-wrap;">${prescription.notes}</p>
+            </div>` : ''}
+    
+            <div style="margin-top: 48px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 0.75rem; color: #64748b;">
+              <p>This is a digitally generated prescription and does not require a physical signature.</p>
+              <p>&copy; ${new Date().getFullYear()} OMA Health. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+    };
+
     const findPatientMutation = useMutation({
       mutationFn: async (phoneNumber) => {
         const token = localStorage.getItem('doctorToken');
@@ -1010,7 +1233,7 @@ export default function DoctorDashboard() {
 
     const sendEmailMutation = useMutation({
       mutationFn: async (emailData) => {
-        console.log('[E-Prescription] Step 5: Firing API call to backend with data:', { ...emailData, pdfBase64: '...' });
+        console.log('[E-Prescription] Firing API call to send HTML email.');
         const token = localStorage.getItem('doctorToken');
         const resp = await fetch(`${API_BASE}/doctor/prescriptions/send-email`, {
           method: 'POST',
@@ -1021,20 +1244,18 @@ export default function DoctorDashboard() {
           body: JSON.stringify(emailData)
         });
         if (!resp.ok) {
-          const errorData = await resp.json();
+          const errorData = await resp.json().catch(() => ({ error: 'Failed to send email.' }));
           console.error('[E-Prescription] Error from backend API:', errorData);
           throw new Error(errorData.error || 'Failed to send email');
         }
-        console.log('[E-Prescription] Step 8: Received successful response from backend.');
+        console.log('[E-Prescription] Received successful response from backend.');
         return resp.json();
       },
       onSuccess: () => {
         toast.success('E-Prescription sent to patient successfully!');
-        setPdfData(null);
       },
       onError: (error) => {
         toast.error(`Failed to send email: ${error.message}`);
-        setPdfData(null);
       }
     });
 
@@ -1064,20 +1285,34 @@ export default function DoctorDashboard() {
         }
         const newPrescription = await resp.json();
 
-        // Enrich the prescription object for the PDF and email
+        // Enrich the prescription object for the email
         return {
           ...newPrescription,
           patient: patientToConfirm, // Use patient data from state
           prescription_items: payload.medications,
+          notes: payload.notes,
         };
       },
       onSuccess: (prescriptionWithDetails) => {
         toast.success('Prescription created successfully');
         queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
         
-        console.log('[E-Prescription] Step 1: Prescription created. Preparing to generate PDF.', prescriptionWithDetails);
-        setPdfData(prescriptionWithDetails);
+        console.log('[E-Prescription] Prescription created. Preparing to send email.', prescriptionWithDetails);
+        
+        if (!prescriptionWithDetails.patient?.email) {
+            toast.error("Patient does not have an email on file. Prescription saved but not sent.");
+            console.error('[E-Prescription] Error: Patient email is missing from patient object:', prescriptionWithDetails.patient);
+        } else {
+            const htmlContent = generatePrescriptionHTML(prescriptionWithDetails, doctor);
+            sendEmailMutation.mutate({
+              userEmail: prescriptionWithDetails.patient.email,
+              userName: prescriptionWithDetails.patient.first_name,
+              doctorName: doctor.name,
+              htmlContent: htmlContent,
+            });
+        }
 
+        // Reset form state
         setShowCreateForm(false);
         setIsConfirmModalOpen(false);
         setPatientToConfirm(null);
@@ -1094,49 +1329,6 @@ export default function DoctorDashboard() {
         toast.error(error.message);
       }
     });
-
-    useEffect(() => {
-      if (pdfData && targetRef.current) {
-        console.log('[E-Prescription] Step 2: `pdfData` updated and `targetRef` is available. Generating PDF.');
-        // use a small timeout to let the component render with new data
-        setTimeout(() => {
-          toPDF().then((blob) => {
-            console.log('[E-Prescription] Step 3: PDF blob generated successfully.', blob);
-            if (!blob) {
-              throw new Error("PDF generation failed, returned blob is empty.");
-            }
-            if (!pdfData.patient?.email) {
-              toast.error("Patient does not have an email address on file.");
-              console.error('[E-Prescription] Error: Patient email is missing from patient object:', pdfData.patient);
-              setPdfData(null);
-              return;
-            }
-            console.log(`[E-Prescription] Patient email found: ${pdfData.patient.email}. Preparing to convert blob to Base64.`);
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = () => {
-              const base64data = reader.result;
-              console.log('[E-Prescription] Step 4: PDF converted to Base64. Calling send-email mutation.');
-              sendEmailMutation.mutate({
-                userEmail: pdfData.patient.email,
-                userName: pdfData.patient.first_name,
-                doctorName: doctor.name,
-                pdfBase64: base64data.split(',')[1], // remove data URI part
-              });
-            };
-            reader.onerror = (error) => {
-              console.error('[E-Prescription] Error converting blob to Base64:', error);
-              toast.error('Failed to process PDF for emailing.');
-              setPdfData(null);
-            };
-          }).catch(err => {
-            console.error('[E-Prescription] Error during `toPDF()` generation:', err);
-            toast.error('Failed to generate PDF.');
-            setPdfData(null);
-          });
-        }, 500);
-      }
-    }, [pdfData, doctor, toPDF, targetRef, sendEmailMutation]);
 
     const addMedication = () => {
       setNewPrescription(prev => ({
@@ -1379,7 +1571,7 @@ export default function DoctorDashboard() {
                         <ul className="list-disc list-inside">
                           {prescription.prescription_items.map((item, idx) => (
                             <li key={idx}>
-                              {item.medication_name} - {item.dosage} (Qty: {item.quantity})
+                              {item.medication_name || item.name} - {item.dosage} (Qty: {item.quantity})
                             </li>
                           ))}
                         </ul>
@@ -1406,39 +1598,59 @@ export default function DoctorDashboard() {
 
   // Availability view component
   function AvailabilityView() {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const { data: fetchedAvailability, isLoading: isAvailabilityLoading } = useQuery({
+        queryKey: ['availability'],
+        queryFn: fetchAvailability,
+    });
+    
     const [editableAvailability, setEditableAvailability] = useState(
       days.map((day, index) => ({
-        day_of_week: index + 1,
+        day_of_week: index,
         day_name: day,
         start_time: '09:00',
         end_time: '17:00',
-        is_active: true
+        is_active: false
       }))
     );
 
     useEffect(() => {
-      // Update editable availability when availability data changes
-      // This will be updated to use React Query for availability
-      // For now, it's a placeholder.
-      // Example: const { data: availability } = useQuery({ queryKey: ['availability'] });
-      // if (availability && availability.length > 0) {
-      //   const updatedAvailability = days.map((day, index) => {
-      //     const existingSlot = availability.find(slot => slot.day_of_week === index + 1);
-      //     return existingSlot ? {
-      //       ...existingSlot,
-      //       day_name: day
-      //     } : {
-      //       day_of_week: index + 1,
-      //       day_name: day,
-      //       start_time: '09:00',
-      //       end_time: '17:00',
-      //       is_active: false
-      //     };
-      //   });
-      //   setEditableAvailability(updatedAvailability);
-      // }
-    }, []); // Removed availability from dependency array as it's not managed by React Query yet
+      if (fetchedAvailability) {
+        const availabilityMap = new Map(fetchedAvailability.map(item => [item.day_of_week, item]));
+        
+        setEditableAvailability(days.map((day, index) => {
+            const existingSlot = availabilityMap.get(index);
+            if (existingSlot) {
+                return {
+                    day_of_week: index,
+                    day_name: day,
+                    start_time: existingSlot.start_time.slice(0, 5),
+                    end_time: existingSlot.end_time.slice(0, 5),
+                    is_active: existingSlot.is_active,
+                };
+            }
+            return {
+                day_of_week: index,
+                day_name: day,
+                start_time: '09:00',
+                end_time: '17:00',
+                is_active: false,
+            };
+        }));
+      }
+    }, [fetchedAvailability]);
+
+    const availabilityMutation = useMutation({
+        mutationFn: updateAvailability,
+        onSuccess: () => {
+            toast.success('Availability updated successfully!');
+            queryClient.invalidateQueries({ queryKey: ['availability'] });
+        },
+        onError: (error) => {
+            toast.error(`Failed to update availability: ${error.message}`);
+        }
+    });
 
     const updateDayAvailability = (dayIndex, field, value) => {
       setEditableAvailability(prev => 
@@ -1448,14 +1660,37 @@ export default function DoctorDashboard() {
       );
     };
 
-    const saveAvailability = async () => {
-      const activeSlots = editableAvailability.filter(slot => slot.is_active);
-      // This will be updated to use React Query for availability
-      // For now, it's a placeholder.
-      // Example: mutation.mutate({ url: `${API_BASE}/doctor/availability`, body: activeSlots });
-      // queryClient.invalidateQueries({ queryKey: ['availability'] });
-      toast.info('Availability saving is not yet implemented with React Query.');
+    const saveAvailability = () => {
+      const activeSlots = editableAvailability
+        .filter(slot => slot.is_active)
+        .map(slot => ({
+            day_of_week: slot.day_of_week,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            is_active: slot.is_active,
+        }));
+      availabilityMutation.mutate(activeSlots);
     };
+    
+    if (isAvailabilityLoading) {
+      return (
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold text-slate-900">Availability Schedule</h2>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6 animate-pulse">
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between py-4 border-b border-slate-100 last:border-0">
+                <div className="h-4 bg-slate-200 rounded w-24"></div>
+                <div className="flex items-center space-x-4">
+                  <div className="h-10 w-28 bg-slate-200 rounded-lg"></div>
+                  <div className="h-10 w-28 bg-slate-200 rounded-lg"></div>
+                  <div className="h-10 w-24 bg-slate-200 rounded-lg"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
     
     return (
       <div className="space-y-6">
@@ -1502,10 +1737,10 @@ export default function DoctorDashboard() {
           <div className="mt-6 pt-6 border-t border-slate-200">
             <button 
               onClick={saveAvailability}
-              disabled={mutation.isLoading}
+              disabled={availabilityMutation.isLoading}
               className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
             >
-              {mutation.isLoading ? 'Saving...' : 'Save Changes'}
+              {availabilityMutation.isLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>
@@ -1515,28 +1750,94 @@ export default function DoctorDashboard() {
 
   // Analytics view component
   function AnalyticsView() {
+    const { data: analyticsData, isLoading, isError, error } = useQuery({
+      queryKey: ['doctorAnalytics'],
+      queryFn: fetchDoctorAnalytics,
+    });
+
+    if (isLoading) {
+      return (
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold text-slate-900">Analytics & Insights</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-pulse">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-200/60 p-6">
+                <div className="h-4 bg-slate-200 rounded w-1/2 mb-3"></div>
+                <div className="h-8 bg-slate-200 rounded w-1/3"></div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6 mt-6 animate-pulse">
+            <div className="h-6 bg-slate-200 rounded w-1/4 mb-4"></div>
+            <div className="h-64 bg-slate-200 rounded"></div>
+          </div>
+        </div>
+      );
+    }
+
+    if (isError) {
+      return <p className="text-red-500">Error fetching analytics: {error.message}</p>;
+    }
+
+    const BarChart = ({ data, dataKey, label }) => {
+      const maxValue = Math.max(...data.map(d => d[dataKey]), 0);
+      return (
+        <div>
+          <h4 className="text-md font-medium text-slate-800 mb-4">{label}</h4>
+          <div className="flex justify-around items-end h-64 space-x-2">
+            {data.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center">
+                <div
+                  className="w-full bg-slate-200 hover:bg-slate-300 transition-colors"
+                  style={{ height: `${(d[dataKey] / (maxValue || 1)) * 100}%` }}
+                  title={`${d.month}: ${d[dataKey]}`}
+                ></div>
+                <span className="text-xs text-slate-500 mt-2">{d.month}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="space-y-6">
         <h2 className="text-xl font-semibold text-slate-900">Analytics & Insights</h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Key Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Monthly Performance</h3>
+            <h3 className="text-sm font-medium text-slate-500 mb-2">Total Earnings</h3>
+            <p className="text-3xl font-bold text-slate-900">₵{analyticsData?.totalEarnings?.toFixed(2) || '0.00'}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-sm font-medium text-slate-500 mb-2">Total Consultations</h3>
+            <p className="text-3xl font-bold text-slate-900">{analyticsData?.totalConsultations || 0}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-sm font-medium text-slate-500 mb-2">Unique Patients</h3>
+            <p className="text-3xl font-bold text-slate-900">{analyticsData?.uniquePatients || 0}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+            <h3 className="text-sm font-medium text-slate-500 mb-2">Completion Rate</h3>
+            <p className="text-3xl font-bold text-slate-900">{analyticsData?.conversionRate || 0}%</p>
+          </div>
+        </div>
+
+        {/* Monthly Performance Chart */}
+        <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">Monthly Performance (Last 6 Months)</h3>
+          {analyticsData?.monthlyPerformance?.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <BarChart data={analyticsData.monthlyPerformance} dataKey="earnings" label="Earnings (₵)" />
+              <BarChart data={analyticsData.monthlyPerformance} dataKey="consultations" label="Consultations" />
+            </div>
+          ) : (
             <div className="text-center py-8">
               <ChartBarIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">Analytics coming soon</p>
+              <p className="text-slate-500">Not enough data to display performance chart.</p>
             </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Patient Satisfaction</h3>
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-emerald-600">4.8</span>
-              </div>
-              <p className="text-slate-500">Average Rating</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -1740,7 +2041,7 @@ export default function DoctorDashboard() {
     const [payoutAmount, setPayoutAmount] = useState('');
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-    const { data: financeData, isLoading } = useQuery({
+    const { data: financeData, isLoading, isError, error } = useQuery({
       queryKey: ['doctorFinance'],
       queryFn: fetchDoctorFinance,
     });
@@ -1749,14 +2050,7 @@ export default function DoctorDashboard() {
       mutationFn: requestPayout,
       onSuccess: (data) => {
         toast.success('Payout request submitted successfully!');
-        queryClient.setQueryData(['doctorFinance'], (oldData) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            availableForPayout: data.newBalance,
-            payoutHistory: [data.newPayout, ...oldData.payoutHistory],
-          };
-        });
+        queryClient.invalidateQueries({ queryKey: ['doctorFinance'] });
         setPayoutAmount('');
       },
       onError: (error) => {
@@ -1768,10 +2062,7 @@ export default function DoctorDashboard() {
       mutationFn: savePaymentMethod,
       onSuccess: (data) => {
         toast.success('Payment method saved!');
-        queryClient.setQueryData(['doctorFinance'], (oldData) => ({
-          ...oldData,
-          paymentMethod: data.paymentMethod,
-        }));
+        queryClient.invalidateQueries({ queryKey: ['doctorFinance'] });
         setIsPaymentModalOpen(false);
       },
       onError: (error) => {
@@ -1796,7 +2087,19 @@ export default function DoctorDashboard() {
     };
 
     if (isLoading) {
-      return <p>Loading financial data...</p>;
+      return (
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold text-slate-900">Finance Overview</h2>
+          <div className="text-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mx-auto"></div>
+            <p className="mt-4 text-slate-500">Loading financial data...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (isError) {
+      return <p className="text-red-500">Error: {error.message}</p>;
     }
 
     return (
@@ -1809,15 +2112,23 @@ export default function DoctorDashboard() {
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
             <h3 className="text-sm font-medium text-slate-500 mb-2">Total Earnings</h3>
             <p className="text-3xl font-bold text-slate-900">₵{financeData?.totalEarnings.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 mt-1">This is your total revenue before platform commission.</p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
             <h3 className="text-sm font-medium text-slate-500 mb-2">Available for Payout</h3>
             <p className="text-3xl font-bold text-emerald-600">₵{financeData?.availableForPayout.toFixed(2)}</p>
+            <p className="text-xs text-slate-400 mt-1">After 15% platform commission.</p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
             <h3 className="text-sm font-medium text-slate-500 mb-2">Last Payout</h3>
-            <p className="text-3xl font-bold text-slate-900">₵{financeData?.lastPayout.amount.toFixed(2)}</p>
-            <p className="text-xs text-slate-400">on {formatDate(financeData?.lastPayout.date)}</p>
+            {financeData?.lastPayout ? (
+              <>
+                <p className="text-3xl font-bold text-slate-900">₵{financeData.lastPayout.amount.toFixed(2)}</p>
+                <p className="text-xs text-slate-400">on {formatDate(financeData.lastPayout.requested_at)}</p>
+              </>
+            ) : (
+              <p className="text-lg text-slate-400 mt-2">No payout history</p>
+            )}
           </div>
         </div>
 
@@ -1840,7 +2151,7 @@ export default function DoctorDashboard() {
               </div>
                 {financeData?.paymentMethod && (
                   <div className="text-xs text-slate-500">
-                    Payout to: {financeData.paymentMethod.provider} ({financeData.paymentMethod.number})
+                    Payout to: {financeData.paymentMethod.provider} ({financeData.paymentMethod.details.number})
                     <button type="button" onClick={() => setIsPaymentModalOpen(true)} className="ml-2 text-blue-600 hover:underline">Change</button>
                   </div>
                 )}
@@ -1871,21 +2182,30 @@ export default function DoctorDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {financeData?.payoutHistory.map(payout => (
-                    <tr key={payout.id} className="border-b border-slate-100 last:border-0">
-                      <td className="py-3 text-sm text-slate-500">{formatDate(payout.date)}</td>
-                      <td className="py-3 text-sm font-medium text-slate-900">₵{payout.amount.toFixed(2)}</td>
-                      <td className="py-3 text-sm">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            payout.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                            payout.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
-                            'bg-slate-100 text-slate-600'
-                        }`}>
-                          {payout.status}
-                        </span>
+                  {financeData?.payoutHistory && financeData.payoutHistory.length > 0 ? (
+                    financeData.payoutHistory.map(payout => (
+                      <tr key={payout.id} className="border-b border-slate-100 last:border-0">
+                        <td className="py-3 text-sm text-slate-500">{formatDate(payout.requested_at)}</td>
+                        <td className="py-3 text-sm font-medium text-slate-900">₵{Number(payout.amount).toFixed(2)}</td>
+                        <td className="py-3 text-sm">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              payout.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                              payout.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                              'bg-rose-100 text-rose-700'
+                          }`}>
+                            {payout.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="3" className="py-8 text-center text-slate-500">
+                        <BanknotesIcon className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                        No payout requests have been made.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1964,13 +2284,13 @@ function BookingsTableSkeleton() {
 // Payment Method Modal Component
 // ==================================
 function PaymentMethodModal({ isOpen, onClose, onSave, isLoading, currentMethod }) {
-  const [provider, setProvider] = useState(currentMethod?.provider || 'MTN Mobile Money');
-  const [number, setNumber] = useState(currentMethod?.number || '');
+  const [provider, setProvider] = useState('MTN Mobile Money');
+  const [number, setNumber] = useState('');
 
   useEffect(() => {
     if (currentMethod) {
       setProvider(currentMethod.provider);
-      setNumber(currentMethod.number);
+      setNumber(currentMethod.details?.number || '');
     } else {
       setProvider('MTN Mobile Money');
       setNumber('');
@@ -2057,64 +2377,6 @@ function PaymentMethodModal({ isOpen, onClose, onSave, isLoading, currentMethod 
     </AnimatePresence>
   );
 }
-
-// ==================================
-// E-Prescription PDF Component
-// ==================================
-const PrescriptionPDF = ({ prescription, doctor, targetRef }) => {
-  if (!prescription || !doctor) return null;
-
-  return (
-    <div ref={targetRef} className="p-8 text-slate-800 bg-white" style={{ width: '210mm', minHeight: '297mm', fontFamily: 'sans-serif' }}>
-      {/* Header */}
-      <div className="flex justify-between items-center pb-4 border-b border-slate-200">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">OMA Health</h1>
-          <p className="text-slate-500">Your Trusted Telemedicine Partner</p>
-        </div>
-        {/* Using a public, static PNG to avoid PDF generation errors */}
-        <img src="https://i.imgur.com/8Yf4Z3j.png" crossOrigin="anonymous" alt="OMA Health Logo" style={{ width: '64px', height: '64px' }} />
-      </div>
-
-      {/* Doctor & Patient Info */}
-      <div className="grid grid-cols-2 gap-8 my-8">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Dr. {doctor.name}</h2>
-          <p className="text-sm text-slate-600">{doctor.specialty}</p>
-          <p className="text-sm text-slate-600">{doctor.phone_number}</p>
-        </div>
-        <div className="text-right">
-          <h2 className="text-lg font-semibold text-slate-900">Patient: {prescription.patient?.first_name || 'N/A'}</h2>
-          <p className="text-sm text-slate-600">Date: {new Date(prescription.created_at).toLocaleDateString()}</p>
-          <p className="text-sm text-slate-600">Reference ID: {prescription.reference_id}</p>
-        </div>
-      </div>
-
-      {/* Prescription Body */}
-      <div>
-        <h2 className="text-xl font-bold text-center mb-6 py-2 bg-slate-100 rounded-lg">E-Prescription (Rx)</h2>
-        <div className="space-y-4">
-          {prescription.prescription_items?.map((item, index) => (
-            <div key={index} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-              <p className="font-semibold text-lg text-slate-800">{item.medication_name}</p>
-              <div className="grid grid-cols-2 mt-2 text-sm">
-                <p><strong className="font-medium text-slate-600">Dosage:</strong> {item.dosage}</p>
-                <p><strong className="font-medium text-slate-600">Quantity:</strong> {item.quantity}</p>
-              </div>
-              <p className="mt-2"><strong className="font-medium text-slate-600">Instructions:</strong> {item.instructions}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="mt-12 pt-4 border-t border-slate-200 text-center text-xs text-slate-500">
-        <p>This is a digitally generated prescription and does not require a physical signature.</p>
-        <p>&copy; {new Date().getFullYear()} OMA Health. All rights reserved.</p>
-      </div>
-    </div>
-  );
-};
 
 // ==================================
 // Patient Confirmation Modal

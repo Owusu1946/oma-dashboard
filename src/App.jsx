@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
@@ -8,6 +8,8 @@ import Pharmacies from './pages/Pharmacies';
 import KYCDashboard from './pages/KYCDashboard';
 import ChatViewer from './pages/ChatViewer';
 import EscalationList from './pages/EscalationList';
+import Bookings from './pages/Bookings';
+import BookingDetails from './pages/BookingDetails';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
@@ -42,9 +44,12 @@ function App() {
         <Route path="users" element={<Users />} />
         <Route path="users/:userId" element={<UserProfile />} />
         <Route path="doctors" element={<Doctors />} />
+        <Route path="bookings" element={<Bookings />} />
+        <Route path="bookings/:bookingId" element={<BookingDetails />} />
         <Route path="pharmacies" element={<Pharmacies />} />
         <Route path="kyc" element={<KYCDashboard />} />
         <Route path="chat" element={<ChatViewer />} />
+        <Route path="chat/:userId" element={<ChatViewer />} />
         <Route path="escalations" element={<EscalationList />} />
       </Route>
       

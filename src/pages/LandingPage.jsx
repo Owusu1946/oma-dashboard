@@ -49,6 +49,18 @@ export default function LandingPage() {
         }
     }, []);
 
+    useEffect(() => {
+        const style = document.createElement('style');
+        style.textContent = `
+            html::-webkit-scrollbar, body::-webkit-scrollbar { display: none !important; }
+            html, body { -ms-overflow-style: none !important; scrollbar-width: none !important; }
+        `;
+        document.head.appendChild(style);
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, []);
+
     const handleAcceptCookies = () => {
         localStorage.setItem('cookie_consent', 'true');
         setShowCookiePopup(false);
@@ -114,8 +126,8 @@ export default function LandingPage() {
                         <h1 className="text-xl font-bold text-slate-900 sm:hidden">OMA DOCTOR👋</h1>
                     </Link>
                     <nav className="hidden md:flex items-center space-x-8">
-                        <a href="#about" className="text-slate-600 hover:text-slate-900 transition-colors">Why Join Us</a>
-                        <a href="#testimonials" className="text-slate-600 hover:text-slate-900 transition-colors">Testimonials</a>
+                        <motion.a href="#about" className="text-slate-600 hover:text-slate-900 transition-colors" whileHover={{ scale: 1.1 }} transition={{ type: 'spring', stiffness: 400, damping: 10 }}>Why Join Us</motion.a>
+                        <motion.a href="#testimonials" className="text-slate-600 hover:text-slate-900 transition-colors" whileHover={{ scale: 1.1 }} transition={{ type: 'spring', stiffness: 400, damping: 10 }}>Testimonials</motion.a>
                     </nav>
                     <div className="hidden md:flex items-center space-x-4">
                         <Link to="/doctor/login" className="text-slate-600 hover:text-slate-900 font-medium transition-colors">
@@ -147,8 +159,8 @@ export default function LandingPage() {
                 >
                     <div className="h-full flex flex-col items-center justify-center pt-20">
                         <nav className="flex flex-col items-center space-y-8">
-                            <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-2xl font-semibold text-slate-700 hover:text-slate-900 transition-colors">Why Join Us</a>
-                            <a href="#testimonials" onClick={() => setIsMenuOpen(false)} className="text-2xl font-semibold text-slate-700 hover:text-slate-900 transition-colors">Testimonials</a>
+                            <motion.a href="#about" onClick={() => setIsMenuOpen(false)} className="text-2xl font-semibold text-slate-700 hover:text-slate-900 transition-colors" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>Why Join Us</motion.a>
+                            <motion.a href="#testimonials" onClick={() => setIsMenuOpen(false)} className="text-2xl font-semibold text-slate-700 hover:text-slate-900 transition-colors" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>Testimonials</motion.a>
                         </nav>
                         <div className="mt-12 flex flex-col items-center space-y-6 w-full px-8">
                              <Link to="/doctor/login" onClick={() => setIsMenuOpen(false)} className="w-full text-center border border-slate-300 text-slate-700 px-8 py-3 rounded-full font-medium hover:bg-slate-100 transition-colors">
