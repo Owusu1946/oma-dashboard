@@ -14,6 +14,7 @@ import {
 import { StarIcon } from '@heroicons/react/24/solid';
 import CookieConsent from '../components/CookieConsent';
 import Marquee from "react-fast-marquee";
+import { Helmet } from 'react-helmet-async';
 
 
 const OMAIcon = () => (
@@ -106,6 +107,59 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-sans">
+        <Helmet>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>OMA for Doctors: Earn by Consulting Patients Online</title>
+            <meta name="description" content="Join OMA, a leading telemedicine platform for doctors. Expand your practice, connect with patients virtually, and earn from online consultations. Sign up today!" />
+
+            
+            <meta name="keywords" content="telemedicine jobs for doctors, online doctor consultation, earn money online doctor, virtual medical practice, healthcare platform for doctors, OMA doctors, optimedixai" />
+            <meta name="robots" content="index, follow" />
+            <link rel="canonical" href="https://doctor.optimedixai.com/" />
+
+            
+            <meta property="og:title" content="OMA for Doctors: Earn by Consulting Patients" />
+            <meta property="og:description" content="Join OMA's network of doctors. Provide virtual care and increase your earnings. Flexible and rewarding." />
+            <meta property="og:image" content="https://doctor.optimedixai.com/og-image.png" />
+            <meta property="og:url" content="https://doctor.optimedixai.com/" />
+            <meta property="og:type" content="website" />
+
+            
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="OMA for Doctors: Earn by Consulting Patients" />
+            <meta name="twitter:description" content="Provide virtual care and increase your earnings with OMA. Join our network of doctors today." />
+            <meta name="twitter:image" content="https://doctor.optimedixai.com/og-image.png" />
+            
+            <script type="application/ld+json">
+                {`
+                    {
+                        "@context": "https://schema.org",
+                        "@type": "MedicalBusiness",
+                        "name": "OMA for Doctors",
+                        "description": "A telemedicine platform for doctors to connect with patients and earn from virtual consultations.",
+                        "url": "https://doctor.optimedixai.com/",
+                        "logo": "https://doctor.optimedixai.com/logo.png",
+                        "contactPoint": {
+                            "@type": "ContactPoint",
+                            "telephone": "+1-555-555-5555",
+                            "contactType": "Doctor Support"
+                        },
+                        "serviceType": "Telehealth",
+                        "sameAs": [
+                            "https://www.facebook.com/oma-health",
+                            "https://www.twitter.com/oma-health",
+                            "https://www.linkedin.com/company/oma-health"
+                        ]
+                    }
+                `}
+            </script>
+        </Helmet>
+        <div className="relative isolate overflow-hidden bg-white">
+
+            <div
+                className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
+            ></div>
+
         {/* Header */}
         <motion.header 
             initial={{ y: -100, opacity: 0 }}
@@ -520,6 +574,7 @@ export default function LandingPage() {
             </div>
         </footer>
         {showCookiePopup && <CookieConsent onAccept={handleAcceptCookies} />}
+        </div>
     </div>
   );
 }
