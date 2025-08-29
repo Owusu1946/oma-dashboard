@@ -1,0 +1,8 @@
+# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
+#
+# Allow all crawlers access to the site.
+User-agent: *
+Disallow: /admin/
+Disallow: /doctor/dashboard/
+
+Sitemap: https://doctor.optimedixai.com/sitemap.xml
