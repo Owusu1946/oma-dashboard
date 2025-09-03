@@ -19,6 +19,7 @@ import DoctorProtectedRoute from './components/DoctorProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import DoctorRegistration from './pages/DoctorRegistration';
 import LegalPage from './pages/LegalPage';
+import DoctorProfile from './pages/DoctorProfile';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
         }
       >
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="doctors/:id" element={<DoctorProfile />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="users/:userId" element={<UserProfile />} />
@@ -49,7 +51,7 @@ function App() {
         <Route path="pharmacies" element={<Pharmacies />} />
         <Route path="kyc" element={<KYCDashboard />} />
         <Route path="chat" element={<ChatViewer />} />
-        <Route path="chat/:userId" element={<ChatViewer />} />
+        <Route path="chat/:sessionId" element={<ChatViewer />} />
         <Route path="escalations" element={<EscalationList />} />
       </Route>
       

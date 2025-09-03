@@ -15,6 +15,8 @@ import { StarIcon } from '@heroicons/react/24/solid';
 import CookieConsent from '../components/CookieConsent';
 import Marquee from "react-fast-marquee";
 import { Helmet } from 'react-helmet-async';
+import toast, { Toaster } from 'react-hot-toast';
+import { CheckCircleIcon, XCircleIcon, CogIcon } from '@heroicons/react/24/outline';
 
 
 const OMAIcon = () => (
@@ -63,9 +65,58 @@ export default function LandingPage() {
         };
     }, []);
 
-    const handleAcceptCookies = () => {
-        localStorage.setItem('cookie_consent', 'true');
+    const showToast = (message, type = 'success') => {
+        const icons = {
+            success: <CheckCircleIcon className="w-6 h-6 text-emerald-500" />,
+            reject: <XCircleIcon className="w-6 h-6 text-red-500" />,
+            save: <CogIcon className="w-6 h-6 text-slate-600" />,
+        };
+
+        toast.custom((t) => (
+            <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className={`flex items-center bg-white shadow-lg rounded-full py-3 px-5 border border-slate-200/80 ${
+                    t.visible ? 'animate-enter' : 'animate-leave'
+                }`}
+            >
+                {icons[type]}
+                <p className="ml-3 text-sm font-medium text-slate-800">{message}</p>
+            </motion.div>
+        ), {
+            position: 'bottom-center',
+        });
+    };
+
+    const handleAcceptAllCookies = () => {
+        localStorage.setItem('cookie_consent', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            accepted: true,
+            preferences: { essential: true, analytics: true, marketing: true },
+        }));
         setShowCookiePopup(false);
+        showToast('All cookies accepted. Thanks!', 'success');
+    };
+
+    const handleRejectAllCookies = () => {
+        localStorage.setItem('cookie_consent', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            accepted: false,
+            preferences: { essential: true, analytics: false, marketing: false },
+        }));
+        setShowCookiePopup(false);
+        showToast('Non-essential cookies rejected.', 'reject');
+    };
+
+    const handleSaveCookiePreferences = (preferences) => {
+        localStorage.setItem('cookie_consent', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            accepted: true, // Accepted with custom preferences
+            preferences,
+        }));
+        setShowCookiePopup(false);
+        showToast('Your cookie preferences have been saved.', 'save');
     };
 
     const testimonials = [
@@ -107,6 +158,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-sans">
+        <Toaster />
         <Helmet>
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             <title>OMA for Doctors: Earn by Consulting Patients Online</title>
@@ -522,10 +574,10 @@ export default function LandingPage() {
                     <div className="col-span-4 md:col-span-2">
                         <h3 className="font-semibold text-white mb-4 tracking-wider">Contact Us</h3>
                         <div className="space-y-4">
-                            <div className="flex items-start space-x-3">
+                            {/* <div className="flex items-start space-x-3">
                                 <MapPinIcon className="w-5 h-5 mt-1 text-slate-400" />
                                 <span>123 Medical Street, Health City</span>
-                            </div>
+                            </div> */}
                             <div className="flex items-start space-x-3">
                                 <PhoneIcon className="w-5 h-5 mt-1 text-slate-400" />
                                 <div>
@@ -573,7 +625,13 @@ export default function LandingPage() {
                 </div>
             </div>
         </footer>
-        {showCookiePopup && <CookieConsent onAccept={handleAcceptCookies} />}
+        {showCookiePopup && (
+            <CookieConsent 
+                onAcceptAll={handleAcceptAllCookies}
+                onRejectAll={handleRejectAllCookies}
+                onSavePreferences={handleSaveCookiePreferences}
+            />
+        )}
         </div>
     </div>
   );

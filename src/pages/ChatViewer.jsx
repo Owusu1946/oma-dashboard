@@ -114,17 +114,17 @@ export default function ChatViewer() {
   const handleBackNavigation = () => {
     // Check if the session was initiated by an admin from the users page
     if (sessionData?.metadata?.initiated_by === 'admin') {
-      navigate(`/users/${userData?.id || ''}`);
+      navigate(`/admin/users/${userData?.id || ''}`);
     } 
     // If this was from an escalation
     else if (location.state?.from === 'escalations') {
-      navigate('/escalations');
+      navigate('/admin/escalations');
     }
     // Default fallback - go to the user profile or users list
     else if (userData?.id) {
-      navigate(`/users/${userData.id}`);
+      navigate(`/admin/users/${userData.id}`);
     } else {
-      navigate('/users');
+      navigate('/admin/users');
     }
   };
 

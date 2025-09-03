@@ -26,7 +26,7 @@ export const startNewChat = async (supabase, userId, navigate) => {
     // If there's an active session, navigate to it
     if (existingSessions && existingSessions.length > 0) {
       toast.success('Navigating to existing active session');
-      navigate(`/chat/${existingSessions[0].id}`);
+      navigate(`/admin/chat/${existingSessions[0].id}`);
       return;
     }
 
@@ -46,7 +46,7 @@ export const startNewChat = async (supabase, userId, navigate) => {
 
     // Navigate to the new chat
     toast.success('New chat session created');
-    navigate(`/chat/${newSession.id}`);
+    navigate(`/admin/chat/${newSession.id}`);
   } catch (error) {
     console.error('Error starting chat:', error);
     toast.error(`Failed to start chat: ${error.message}`);

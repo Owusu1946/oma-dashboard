@@ -5,7 +5,7 @@ import { ArrowLeftIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 export default function DoctorProfile() {
-  const { doctorId } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
   const { supabase } = useAuth();
   
@@ -37,7 +37,7 @@ export default function DoctorProfile() {
 
   useEffect(() => {
     fetchDoctorData();
-  }, [doctorId]);
+  }, [id]);
 
   const fetchDoctorData = async () => {
     try {
@@ -47,7 +47,7 @@ export default function DoctorProfile() {
       const { data: doctorData, error: doctorError } = await supabase
         .from('doctors')
         .select('*')
-        .eq('id', doctorId)
+        .eq('id', id)
         .single();
 
       if (doctorError) throw doctorError;
@@ -77,7 +77,7 @@ export default function DoctorProfile() {
         const { data: rules, error: availErr } = await supabase
           .from('doctor_availability')
           .select('*')
-          .eq('doctor_id', doctorId)
+          .eq('doctor_id', id)
           .eq('is_active', true);
         if (!availErr && rules) {
           const map = new Map();
@@ -105,7 +105,7 @@ export default function DoctorProfile() {
           *,
           users (id, phone_number, first_name)
         `)
-        .eq('doctor_id', doctorId)
+        .eq('doctor_id', id)
         .order('booking_date', { ascending: false })
         .limit(5);
       
@@ -225,7 +225,7 @@ export default function DoctorProfile() {
       const { data, error } = await supabase
         .from('doctors')
         .update(formattedData)
-        .eq('id', doctorId)
+        .eq('id', id)
         .select()
         .single();
 

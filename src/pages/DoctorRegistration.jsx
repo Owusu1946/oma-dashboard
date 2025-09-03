@@ -11,7 +11,11 @@ import {
   BuildingOfficeIcon,
   CurrencyDollarIcon,
   ArrowRightIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  SparklesIcon,
+  UserGroupIcon,
+  ClockIcon,
+  ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 
 const API_BASE = (import.meta.env.VITE_DB_API_URL || 'https://oma-db-service-pcxd.onrender.com').replace(/\/+$/, '');
@@ -31,6 +35,7 @@ export default function DoctorRegistration() {
   });
   const [loading, setLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -89,59 +94,121 @@ export default function DoctorRegistration() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl w-full space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-slate-900">Become an OMA Health Doctor</h2>
-          <p className="mt-2 text-lg text-slate-600">Join our network of trusted medical professionals.</p>
+    <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-2 xl:grid-cols-5">
+      <div className="hidden lg:flex flex-col justify-center bg-slate-900 p-12 text-white relative overflow-hidden xl:col-span-2">
+        <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full" />
+        <div className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-96 h-96 bg-blue-500/10 rounded-full" />
+        
+        <div className="z-10">
+          <h2 className="text-4xl font-bold">Empower Your Practice.</h2>
+          <p className="mt-4 text-lg text-slate-300">Join OMA Health and connect with patients seeking your expertise, all from a seamless and secure digital platform.</p>
+          <ul className="mt-10 space-y-6">
+            <li className="flex items-start">
+              <SparklesIcon className="h-6 w-6 text-emerald-400 mr-4 mt-1 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold">Expand Your Reach</h3>
+                <p className="text-slate-400">Connect with a broader patient base beyond your local area.</p>
+              </div>
+            </li>
+            <li className="flex items-start">
+              <ClockIcon className="h-6 w-6 text-emerald-400 mr-4 mt-1 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold">Flexible Scheduling</h3>
+                <p className="text-slate-400">Manage your appointments and consultations at your convenience.</p>
+              </div>
+            </li>
+            <li className="flex items-start">
+              <UserGroupIcon className="h-6 w-6 text-emerald-400 mr-4 mt-1 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold">Join a Trusted Network</h3>
+                <p className="text-slate-400">Become part of a community of respected medical professionals.</p>
+              </div>
+            </li>
+          </ul>
         </div>
-        <motion.form
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          onSubmit={handleSubmit}
-          className="bg-white p-8 rounded-2xl shadow-xl space-y-6 border border-slate-200/60"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputField name="name" label="Full Name" icon={UserIcon} value={formData.name} onChange={handleChange} required />
-            <InputField name="phone_number" label="Phone Number" icon={PhoneIcon} value={formData.phone_number} onChange={handleChange} required />
-            <InputField name="email" label="Email Address" type="email" icon={EnvelopeIcon} value={formData.email} onChange={handleChange} required />
-            <InputField name="specialty" label="Specialty" icon={AcademicCapIcon} value={formData.specialty} onChange={handleChange} />
-            <InputField name="medical_license_number" label="Medical License Number" icon={IdentificationIcon} value={formData.medical_license_number} onChange={handleChange} required />
-            <InputField name="hospital_affiliation" label="Hospital of Affiliation" icon={BuildingOfficeIcon} value={formData.hospital_affiliation} onChange={handleChange} />
-            <InputField name="experience_years" label="Years of Experience" type="number" icon={AcademicCapIcon} value={formData.experience_years} onChange={handleChange} />
-            <InputField name="consultation_fee" label="Consultation Fee (GHS)" type="number" icon={CurrencyDollarIcon} value={formData.consultation_fee} onChange={handleChange} />
-          </div>
+      </div>
+      
+      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 xl:col-span-3">
+        <div className="max-w-xl w-full space-y-8">
           <div>
-            <label htmlFor="bio" className="block text-sm font-medium text-slate-700 mb-2">Biography</label>
-            <textarea
-              id="bio"
-              name="bio"
-              rows={4}
-              value={formData.bio}
-              onChange={handleChange}
-              className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
-              placeholder="Tell patients a little about yourself..."
-            ></textarea>
+            <Link to="/" className="inline-flex items-center text-slate-600 hover:text-slate-900 transition-colors mb-4 text-sm font-medium">
+              <ArrowLeftIcon className="h-4 w-4 mr-2" />
+              Back to Home
+            </Link>
+            <div className="text-center lg:text-left">
+              <h2 className="text-3xl font-bold text-slate-900">Become an OMA Health Doctor</h2>
+              <p className="mt-2 text-lg text-slate-600">Join our network of trusted medical professionals.</p>
+            </div>
           </div>
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50"
-            >
-              {loading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : 'Submit Application'}
-              <ArrowRightIcon className="ml-2 h-5 w-5" />
-            </button>
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-slate-600">
-              Already have an account?{' '}
-              <Link to="/doctor/login" className="font-medium text-slate-800 hover:text-slate-600">
-                Sign In
-              </Link>
-            </p>
-          </div>
-        </motion.form>
+          <motion.form
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            onSubmit={handleSubmit}
+            className="bg-white p-8 rounded-2xl shadow-xl space-y-6 border border-slate-200/60"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InputField name="name" label="Full Name" icon={UserIcon} value={formData.name} onChange={handleChange} required />
+              <InputField name="phone_number" label="Phone Number" icon={PhoneIcon} value={formData.phone_number} onChange={handleChange} required />
+              <InputField name="email" label="Email Address" type="email" icon={EnvelopeIcon} value={formData.email} onChange={handleChange} required />
+              <InputField name="specialty" label="Specialty" icon={AcademicCapIcon} value={formData.specialty} onChange={handleChange} />
+              <InputField name="medical_license_number" label="Medical License Number" icon={IdentificationIcon} value={formData.medical_license_number} onChange={handleChange} required />
+              <InputField name="hospital_affiliation" label="Hospital of Affiliation" icon={BuildingOfficeIcon} value={formData.hospital_affiliation} onChange={handleChange} />
+              <InputField name="experience_years" label="Years of Experience" type="number" icon={AcademicCapIcon} value={formData.experience_years} onChange={handleChange} />
+              <InputField name="consultation_fee" label="Consultation Fee (GHS)" type="number" icon={CurrencyDollarIcon} value={formData.consultation_fee} onChange={handleChange} />
+            </div>
+            <div>
+              <label htmlFor="bio" className="block text-sm font-medium text-slate-700 mb-2">Biography</label>
+              <textarea
+                id="bio"
+                name="bio"
+                rows={4}
+                value={formData.bio}
+                onChange={handleChange}
+                className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+                placeholder="Tell patients a little about yourself..."
+              ></textarea>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="terms"
+                name="terms"
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-slate-600 focus:ring-slate-500"
+              />
+              <label htmlFor="terms" className="ml-2 block text-sm text-slate-600">
+                I have read and agree to the{' '}
+                <Link to="/legal/terms-of-service" target="_blank" rel="noopener noreferrer" className="font-medium text-slate-800 hover:text-slate-600">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link to="/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="font-medium text-slate-800 hover:text-slate-600">
+                  Privacy Policy
+                </Link>
+                .
+              </label>
+            </div>
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={loading || !agreedToTerms}
+                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50"
+              >
+                {loading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : 'Submit Application'}
+                <ArrowRightIcon className="ml-2 h-5 w-5" />
+              </button>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-slate-600">
+                Already have an account?{' '}
+                <Link to="/doctor/login" className="font-medium text-slate-800 hover:text-slate-600">
+                  Sign In
+                </Link>
+              </p>
+            </div>
+          </motion.form>
+        </div>
       </div>
     </div>
   );
